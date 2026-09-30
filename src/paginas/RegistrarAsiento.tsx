@@ -91,6 +91,29 @@ export function RegistrarAsiento() {
     );
   }
 
+  function cambiarCuenta(idLinea: string, cuentaId: string) {
+    const linea = lineas.find((item) => item.id === idLinea);
+    if (!linea || modo !== 'signo') {
+      actualizarLinea(idLinea, { cuentaId });
+      return;
+    }
+    // En modo signo, el lado depende del tipo de cuenta: al cambiarla hay que
+    // recalcularlo conservando el signo que el usuario eligio.
+    const signo = signoDeLinea(linea);
+    const monto = montoDeLinea(linea);
+    const cuenta = porId.get(cuentaId);
+    if (!cuenta || esCero(aNumero(monto))) {
+      actualizarLinea(idLinea, { cuentaId });
+      return;
+    }
+    const movimiento = movimientoDesdeSigno(cuenta.tipo, signo, aNumero(monto));
+    actualizarLinea(idLinea, {
+      cuentaId,
+      debe: esCero(movimiento.debe) ? '' : monto,
+      haber: esCero(movimiento.haber) ? '' : monto,
+    });
+  }
+
   function cambiarImporte(idLinea: string, columna: 'debe' | 'haber', valor: string) {
     // Un importe va en el Debe o en el Haber, nunca en los dos a la vez.
     actualizarLinea(idLinea, {
@@ -314,9 +337,7 @@ export function RegistrarAsiento() {
                         aria-label="Cuenta"
                         value={linea.cuentaId}
                         className={error ? 'con-error' : ''}
-                        onChange={(evento) =>
-                          actualizarLinea(linea.id, { cuentaId: evento.target.value })
-                        }
+                        onChange={(evento) => cambiarCuenta(linea.id, evento.target.value)}
                       >
                         <option value="">Selecciona una cuenta…</option>
                         {cuentas.map((item) => (
@@ -471,13 +492,13 @@ export function RegistrarAsiento() {
           </div>
         </div>
 
-        {mostrarErrores && (errores.cuadre || errores.lineas) && (
+        {mostrarErrores && !resumen.cuadrado && (errores.cuadre || errores.lineas) && (
           <div style={{ marginTop: 14 }}>
             <Aviso tipo="error">{errores.cuadre ?? errores.lineas}</Aviso>
           </div>
         )}
 
-        {redondear(resumen.totalDebe) > 0 && resumen.cuadrado && !mostrarErrores && (
+        {redondear(resumen.totalDebe) > 0 && resumen.cuadrado && (
           <div style={{ marginTop: 14 }}>
             <Aviso tipo="exito">Listo para registrar.</Aviso>
           </div>

@@ -52,8 +52,7 @@ export function Configuracion() {
       return;
     }
 
-    almacen.renombrarCaso(caso!.id, nombreCaso);
-    almacen.actualizarEmpresa(empresa);
+    almacen.actualizarDatosCaso({ nombre: nombreCaso, empresa });
     avisos.exito('Configuración guardada.');
   }
 

@@ -101,4 +101,61 @@ describe('flujo completo de la aplicacion', () => {
     abrirApp();
     expect((await screen.findAllByText('CYBERTEC S.A.')).length).toBeGreaterThan(0);
   }, 30000);
+  it('en modo signo coloca el importe del lado correcto al elegir la cuenta despues', async () => {
+    const usuario = userEvent.setup();
+    abrirApp();
+
+    await screen.findByText('Bienvenido a ContaSys');
+    await usuario.click(screen.getByRole('link', { name: 'Casos' }));
+    const demo = await screen.findByText('Comercializadora Metropolitana');
+    await usuario.click(
+      within(demo.closest('.acceso') as HTMLElement).getByRole('button', { name: 'Cargar' }),
+    );
+    await screen.findByRole('heading', { name: 'Libro Diario', level: 2 });
+
+    await usuario.click(screen.getByRole('link', { name: 'Registrar Asiento' }));
+    await screen.findByText('Movimientos del asiento');
+    await usuario.click(screen.getByRole('button', { name: /Modo signo/ }));
+
+    // Se escribe el monto antes de elegir la cuenta, a proposito.
+    const montos = screen.getAllByLabelText('Monto');
+    await usuario.type(montos[0], '500');
+    await usuario.type(montos[1], '500');
+
+    const cuentas = screen.getAllByLabelText('Cuenta');
+    await usuario.selectOptions(cuentas[0], within(cuentas[0]).getByRole('option', { name: /101 — Caja/ }));
+    await usuario.selectOptions(cuentas[1], within(cuentas[1]).getByRole('option', { name: /401 — Ventas/ }));
+
+    // Caja es deudora y Ventas acreedora: con signo + el asiento debe cuadrar.
+    expect(await screen.findByText('Listo para registrar.')).toBeInTheDocument();
+  }, 30000);
+
+  it('guarda a la vez el nombre del caso y los datos de la empresa', async () => {
+    const usuario = userEvent.setup();
+    abrirApp();
+
+    await screen.findByText('Bienvenido a ContaSys');
+    await usuario.click(screen.getByRole('link', { name: 'Casos' }));
+    const demo = await screen.findByText('CYBERTEC S.A.');
+    await usuario.click(
+      within(demo.closest('.acceso') as HTMLElement).getByRole('button', { name: 'Cargar' }),
+    );
+    await screen.findByRole('heading', { name: 'Libro Diario', level: 2 });
+
+    await usuario.click(screen.getByRole('link', { name: 'Configuración' }));
+    const nombreCaso = await screen.findByLabelText('Nombre del caso');
+    await usuario.clear(nombreCaso);
+    await usuario.type(nombreCaso, 'Caso de prueba');
+    const razonSocial = screen.getByLabelText('Razón social');
+    await usuario.clear(razonSocial);
+    await usuario.type(razonSocial, 'Nueva Empresa S.A.C.');
+    await usuario.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await screen.findByText('Configuración guardada.');
+    // El menu muestra el nombre del caso y el reporte la razon social.
+    expect(screen.getByText('Caso de prueba')).toBeInTheDocument();
+    await usuario.click(screen.getByRole('link', { name: 'Libro Diario' }));
+    expect(await screen.findByText('Nueva Empresa S.A.C.')).toBeInTheDocument();
+    expect(screen.getByText('Caso de prueba')).toBeInTheDocument();
+  }, 30000);
 });

@@ -105,6 +105,7 @@ export interface ValorAlmacen {
   seleccionarCaso: (id: string) => void;
   importarCaso: (datos: unknown) => Resultado;
   actualizarEmpresa: (cambios: Partial<Empresa>) => void;
+  actualizarDatosCaso: (cambios: { nombre?: string; empresa?: Partial<Empresa> }) => void;
   agregarCuenta: (borrador: BorradorCuenta) => Cuenta | null;
   actualizarCuenta: (id: string, cambios: Partial<BorradorCuenta>) => void;
   eliminarCuenta: (id: string) => Resultado;
@@ -227,6 +228,19 @@ export function ProveedorAlmacen({ children }: { children: ReactNode }) {
   const actualizarEmpresa = useCallback(
     (cambios: Partial<Empresa>) => {
       actualizarCasoActivo((caso) => ({ ...caso, empresa: { ...caso.empresa, ...cambios } }));
+    },
+    [actualizarCasoActivo],
+  );
+
+  const actualizarDatosCaso = useCallback(
+    (cambios: { nombre?: string; empresa?: Partial<Empresa> }) => {
+      // Un solo despacho: dos seguidos partirian del mismo caso y el segundo
+      // pisaria al primero.
+      actualizarCasoActivo((caso) => ({
+        ...caso,
+        nombre: cambios.nombre?.trim() || caso.nombre,
+        empresa: { ...caso.empresa, ...cambios.empresa },
+      }));
     },
     [actualizarCasoActivo],
   );
@@ -376,6 +390,7 @@ export function ProveedorAlmacen({ children }: { children: ReactNode }) {
       seleccionarCaso,
       importarCaso,
       actualizarEmpresa,
+      actualizarDatosCaso,
       agregarCuenta,
       actualizarCuenta,
       eliminarCuenta,
@@ -397,6 +412,7 @@ export function ProveedorAlmacen({ children }: { children: ReactNode }) {
       seleccionarCaso,
       importarCaso,
       actualizarEmpresa,
+      actualizarDatosCaso,
       agregarCuenta,
       actualizarCuenta,
       eliminarCuenta,
