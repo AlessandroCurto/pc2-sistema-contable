@@ -212,7 +212,7 @@ export function ProveedorAlmacen({ children }: { children: ReactNode }) {
   const importarCaso = useCallback((datos: unknown) => {
     const caso = saneaCaso(datos);
     if (!caso) {
-      return { ok: false, mensaje: 'El archivo no tiene la estructura de un caso de ContaSys.' };
+      return { ok: false, mensaje: 'El archivo no tiene la estructura de un caso de Contabilidad UNI.' };
     }
     if (caso.cuentas.length === 0) {
       return { ok: false, mensaje: 'El archivo no trae ninguna cuenta válida.' };

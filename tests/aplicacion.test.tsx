@@ -21,7 +21,7 @@ describe('flujo completo de la aplicacion', () => {
     const usuario = userEvent.setup();
     abrirApp();
 
-    await screen.findByText('Bienvenido a ContaSys');
+    await screen.findByText('Bienvenido a Contabilidad UNI');
 
     await usuario.click(screen.getByRole('link', { name: 'Casos' }));
     const tarjetaDemo = await screen.findByText('CYBERTEC S.A.');
@@ -53,7 +53,7 @@ describe('flujo completo de la aplicacion', () => {
     const usuario = userEvent.setup();
     abrirApp();
 
-    await screen.findByText('Bienvenido a ContaSys');
+    await screen.findByText('Bienvenido a Contabilidad UNI');
     await usuario.click(screen.getByRole('link', { name: 'Casos' }));
     const tarjetaDemo = await screen.findByText('Comercializadora Metropolitana');
     const fila = tarjetaDemo.closest('.acceso');
@@ -86,7 +86,7 @@ describe('flujo completo de la aplicacion', () => {
     const usuario = userEvent.setup();
     const primera = abrirApp();
 
-    await screen.findByText('Bienvenido a ContaSys');
+    await screen.findByText('Bienvenido a Contabilidad UNI');
     await usuario.click(screen.getByRole('link', { name: 'Casos' }));
     const tarjetaDemo = await screen.findByText('CYBERTEC S.A.');
     await usuario.click(
@@ -105,7 +105,7 @@ describe('flujo completo de la aplicacion', () => {
     const usuario = userEvent.setup();
     abrirApp();
 
-    await screen.findByText('Bienvenido a ContaSys');
+    await screen.findByText('Bienvenido a Contabilidad UNI');
     await usuario.click(screen.getByRole('link', { name: 'Casos' }));
     const demo = await screen.findByText('Comercializadora Metropolitana');
     await usuario.click(
@@ -134,7 +134,7 @@ describe('flujo completo de la aplicacion', () => {
     const usuario = userEvent.setup();
     abrirApp();
 
-    await screen.findByText('Bienvenido a ContaSys');
+    await screen.findByText('Bienvenido a Contabilidad UNI');
     await usuario.click(screen.getByRole('link', { name: 'Casos' }));
     const demo = await screen.findByText('CYBERTEC S.A.');
     await usuario.click(

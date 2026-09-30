@@ -28,8 +28,9 @@ export interface OpcionesReporte {
   secciones: SeccionReporte[];
 }
 
-const AZUL: [number, number, number] = [32, 80, 129];
+const NEGRO: [number, number, number] = [17, 17, 17];
 const GRIS: [number, number, number] = [241, 244, 248];
+const AMARILLO: [number, number, number] = [242, 194, 0];
 
 /**
  * Arma el reporte completo en PDF. jsPDF se carga solo cuando hace falta,
@@ -52,7 +53,7 @@ export async function generarReportePdf(caso: Caso, opciones: OpcionesReporte): 
 
   function titulo(texto: string) {
     if (cursor > 0) documento.addPage();
-    documento.setFillColor(...AZUL);
+    documento.setFillColor(...NEGRO);
     documento.rect(0, 0, anchoPagina, 58, 'F');
     documento.setTextColor(255, 255, 255);
     documento.setFontSize(15);
@@ -70,7 +71,7 @@ export async function generarReportePdf(caso: Caso, opciones: OpcionesReporte): 
       startY: cursor,
       margin: { left: 40, right: 40 },
       styles: { fontSize: 8.5, cellPadding: 4, overflow: 'linebreak' },
-      headStyles: { fillColor: AZUL, textColor: 255, fontSize: 8.5 },
+      headStyles: { fillColor: NEGRO, textColor: AMARILLO, fontSize: 8.5 },
       alternateRowStyles: { fillColor: GRIS },
       columnStyles: anchos
         ? Object.fromEntries(
@@ -86,7 +87,7 @@ export async function generarReportePdf(caso: Caso, opciones: OpcionesReporte): 
   }
 
   // Portada
-  documento.setFillColor(...AZUL);
+  documento.setFillColor(...NEGRO);
   documento.rect(0, 0, anchoPagina, 200, 'F');
   documento.setTextColor(255, 255, 255);
   documento.setFontSize(26);
@@ -99,7 +100,7 @@ export async function generarReportePdf(caso: Caso, opciones: OpcionesReporte): 
   documento.setTextColor(20, 24, 31);
   documento.setFontSize(10);
   documento.text(
-    `Generado el ${formatearFecha(new Date().toISOString().slice(0, 10))} con ContaSys.`,
+    `Generado el ${formatearFecha(new Date().toISOString().slice(0, 10))} con Contabilidad UNI.`,
     40,
     240,
   );
@@ -282,7 +283,7 @@ export async function generarReportePdf(caso: Caso, opciones: OpcionesReporte): 
     documento.setFontSize(8);
     documento.setTextColor(120, 127, 138);
     documento.text(
-      `ContaSys · ${empresa} · Página ${pagina} de ${totalPaginas}`,
+      `Contabilidad UNI · ${empresa} · Página ${pagina} de ${totalPaginas}`,
       40,
       documento.internal.pageSize.getHeight() - 20,
     );

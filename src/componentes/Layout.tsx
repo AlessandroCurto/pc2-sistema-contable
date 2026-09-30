@@ -11,11 +11,11 @@ function MenuLateral({ abierto, cerrar }: { abierto: boolean; cerrar: () => void
     <aside className={`menu-lateral no-imprimir${abierto ? ' abierto' : ''}`}>
       <div className="menu-marca">
         <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
-          <rect width="32" height="32" rx="7" fill="#2563eb" />
-          <path d="M8 22V10h4v12zM14 22V14h4v8zM20 22v-6h4v6z" fill="#fff" />
+          <rect width="32" height="32" rx="7" fill="#0a0a0a" />
+          <path d="M8 22V10h4v12zM14 22V14h4v8zM20 22v-6h4v6z" fill="#f2c200" />
         </svg>
         <div>
-          <strong>ContaSys</strong>
+          <strong>Contabilidad UNI</strong>
           <span>Sistema Contable</span>
         </div>
       </div>
@@ -48,7 +48,7 @@ function MenuLateral({ abierto, cerrar }: { abierto: boolean; cerrar: () => void
       })}
 
       <div className="menu-pie">
-        ContaSys — Sistema Contable
+        Contabilidad UNI — Sistema Contable
         <br />
         Los datos se guardan en este navegador.
       </div>
@@ -86,12 +86,12 @@ export function Layout() {
             {menuAbierto ? <IconoCerrar /> : <IconoMenu />}
           </button>
           <div>
-            <h1>{entrada?.etiqueta ?? 'ContaSys'}</h1>
+            <h1>{entrada?.etiqueta ?? 'Contabilidad UNI'}</h1>
             <div className="subtitulo">{entrada?.descripcion ?? 'Sistema contable'}</div>
           </div>
         </header>
         <main className="pagina">
-          {cargando ? <Cargando texto="Abriendo ContaSys…" /> : <Outlet />}
+          {cargando ? <Cargando texto="Abriendo Contabilidad UNI…" /> : <Outlet />}
         </main>
       </div>
     </div>

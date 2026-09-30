@@ -70,7 +70,7 @@ export function ReportePdf() {
     const asunto = encodeURIComponent(`Reporte financiero - ${empresa}`);
     const cuerpo = encodeURIComponent(
       [
-        `Adjunto el reporte financiero de ${empresa} generado con ContaSys.`,
+        `Adjunto el reporte financiero de ${empresa} generado con Contabilidad UNI.`,
         '',
         `Incluye: ${SECCIONES.filter((seccion) => secciones.includes(seccion.id))
           .map((seccion) => seccion.etiqueta)
@@ -164,7 +164,7 @@ export function ReportePdf() {
 
       <Tarjeta
         titulo="Enviar por correo"
-        subtitulo="ContaSys funciona sin servidor, así que el envío se hace desde tu propio programa de correo."
+        subtitulo="Contabilidad UNI funciona sin servidor, así que el envío se hace desde tu propio programa de correo."
       >
         <div className="fila-campos">
           <div style={{ gridColumn: 'span 2' }}>

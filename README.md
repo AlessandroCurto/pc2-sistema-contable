@@ -1,4 +1,4 @@
-# ContaSys — Aplicativo de un Sistema Contable
+# Contabilidad UNI — Aplicativo de un Sistema Contable
 
 Aplicación web que automatiza el ciclo contable completo: se registran los asientos de
 cualquier caso y el sistema arma el **Libro Diario**, el **Libro Mayor**, el **Balance de

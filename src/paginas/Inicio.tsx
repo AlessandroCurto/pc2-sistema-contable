@@ -40,7 +40,7 @@ export function Inicio() {
     return (
       <Tarjeta>
         <EstadoVacio
-          titulo="Bienvenido a ContaSys"
+          titulo="Bienvenido a Contabilidad UNI"
           descripcion={
             casos.length === 0
               ? 'Crea un caso con la empresa del enunciado, registra sus asientos y el sistema arma el libro diario, el libro mayor, el balance de comprobación, el estado de resultados y el balance general.'
@@ -110,12 +110,12 @@ export function Inicio() {
       </Tarjeta>
 
       <Tarjeta titulo="Acciones rápidas">
-        <div className="rejilla rejilla-2">
+        <div className="rejilla rejilla-3">
           {ACCESOS.map((ruta) => {
             const entrada = MENU.find((item) => item.ruta === ruta);
             if (!entrada) return null;
             return (
-              <Link key={ruta} to={ruta} className="acceso">
+              <Link key={ruta} to={ruta} className="acceso centrado">
                 <span className="acceso-icono">{entrada.icono}</span>
                 <span>
                   <strong>{entrada.etiqueta}</strong>
