@@ -336,10 +336,26 @@ button {
   line-height: 1.4;
 }
 
+/*
+ * Rejilla de los accesos rápidos de Inicio.
+ * Columnas de ancho acotado (no se estiran) y centradas: así el bloque queda
+ * centrado en la página y una última fila incompleta también queda centrada,
+ * en vez de pegarse a la izquierda.
+ */
+.rejilla-accesos {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 240px));
+  justify-content: center;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
 /* Variante centrada: icono arriba, texto centrado (accesos rápidos de Inicio). */
 .acceso.centrado {
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
   gap: 10px;
   padding: 22px 18px;

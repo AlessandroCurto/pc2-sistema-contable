@@ -110,7 +110,7 @@ export function Inicio() {
       </Tarjeta>
 
       <Tarjeta titulo="Acciones rápidas">
-        <div className="rejilla rejilla-3">
+        <div className="rejilla-accesos">
           {ACCESOS.map((ruta) => {
             const entrada = MENU.find((item) => item.ruta === ruta);
             if (!entrada) return null;
