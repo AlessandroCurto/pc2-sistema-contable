@@ -1,0 +1,71 @@
+{% extends "nucleo/base.html" %}
+{% load iconos %}
+
+{% block contenido %}
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Plan de cuentas de {{ caso.nombre }}</h2>
+        <div class="subtitulo">
+          {{ cuentas|length }} cuentas. El tipo decide si el saldo es deudor o acreedor.
+        </div>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo sin-espacio">
+      {% if not cuentas %}
+        <div class="estado-vacio">
+          <h3>Sin cuentas</h3>
+          <p>Agrega las cuentas del enunciado con el formulario de abajo.</p>
+        </div>
+      {% else %}
+        <div class="tabla-envoltorio">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th style="width: 110px">Código</th>
+                <th>Cuenta</th>
+                <th style="width: 130px">Tipo</th>
+                <th style="width: 190px">Clasificación</th>
+                <th style="width: 170px">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cuenta in cuentas %}
+                <tr>
+                  <td class="codigo">{{ cuenta.codigo }}</td>
+                  <td>{{ cuenta.nombre }}</td>
+                  <td>{{ cuenta.etiqueta_tipo }}</td>
+                  <td>{{ cuenta.etiqueta_rubro }}</td>
+                  <td>
+                    <div class="lista-acciones">
+                      <a class="boton secundario chico" href="{% url 'cuenta_editar' cuenta.pk %}">
+                        {% icono "lapiz" 14 %} Editar
+                      </a>
+                      <form method="post" action="{% url 'cuenta_eliminar' cuenta.pk %}" data-confirmar="Se eliminará la cuenta {{ cuenta.codigo }}. ¿Continuar?">
+                        {% csrf_token %}
+                        <button class="boton peligro chico" type="submit">{% icono "basura" 14 %}</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera"><h2>Agregar cuenta</h2></div>
+    <div class="tarjeta-cuerpo">
+      <form method="post">
+        {% csrf_token %}
+        {% include "nucleo/_campos.html" with formulario=formulario %}
+        <div class="lista-acciones" style="margin-top: 14px">
+          <button class="boton" type="submit">{% icono "mas" 16 %} Agregar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

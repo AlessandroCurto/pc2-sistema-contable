@@ -1,0 +1,102 @@
+{% extends "nucleo/base.html" %}
+{% load iconos %}
+
+{% block contenido %}
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Generar Reporte Completo</h2>
+        <div class="subtitulo">
+          Reúne los reportes elegidos en un solo archivo PDF listo para imprimir o enviar.
+        </div>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo">
+      <form method="post">
+        {% csrf_token %}
+        <div class="fila-campos">
+          <div class="campo" style="grid-column: span 2">
+            <label for="{{ formulario.nombre_empresa.id_for_label }}">
+              {{ formulario.nombre_empresa.label }}
+            </label>
+            {{ formulario.nombre_empresa }}
+            <span class="ayuda">Si lo dejas vacío se usa "{{ caso.razon_social|default:caso.nombre }}".</span>
+          </div>
+        </div>
+
+        <fieldset style="border: 1px solid var(--gris-200); border-radius: var(--radio-chico); padding: 14px; margin-top: 16px">
+          <legend style="font-size: 12.5px; font-weight: 600; padding: 0 6px">Reportes incluidos</legend>
+          <div class="rejilla rejilla-3">
+            {% for opcion in formulario.secciones %}
+              <label class="casilla">{{ opcion.tag }}<span>{{ opcion.choice_label }}</span></label>
+            {% endfor %}
+          </div>
+          {% for error in formulario.secciones.errors %}<span class="error">{{ error }}</span>{% endfor %}
+        </fieldset>
+
+        <div class="lista-acciones" style="margin-top: 16px">
+          <button class="boton" type="submit">{% icono "pdf" 16 %} Generar y descargar PDF</button>
+          <a class="boton secundario" href="{% url 'reporte_excel' %}">
+            {% icono "excel" 16 %} Descargar en Excel
+          </a>
+        </div>
+      </form>
+
+      <div class="aviso info" style="margin-top: 16px">
+        <span>
+          El PDF lo arma el servidor con ReportLab y el Excel con pandas: una hoja por reporte, más
+          el plan de cuentas. Los dos salen de los mismos cálculos que ves en pantalla.
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Enviar por correo</h2>
+        <div class="subtitulo">El envío se hace desde tu propio programa de correo.</div>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo">
+      <div class="fila-campos">
+        <div class="campo" style="grid-column: span 2">
+          <label for="correo-destino">Correo electrónico de destino</label>
+          <input type="email" id="correo-destino" placeholder="ejemplo@gmail.com" />
+        </div>
+      </div>
+      <div class="lista-acciones" style="margin-top: 14px">
+        <button type="button" class="boton secundario" id="boton-correo">
+          {% icono "correo" 16 %} Preparar el correo
+        </button>
+      </div>
+      <div class="aviso info" style="margin-top: 14px">
+        <span>
+          Se abre tu programa de correo con el asunto y el mensaje ya escritos. Descarga el PDF
+          primero y adjúntalo. Un envío automático necesitaría una cuenta de correo configurada en
+          el servidor (Django trae django.core.mail para eso).
+        </span>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    document.getElementById('boton-correo').addEventListener('click', function () {
+      var campo = document.getElementById('correo-destino');
+      var correo = (campo.value || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo)) {
+        campo.focus();
+        return;
+      }
+      var empresa = '{{ caso.razon_social|default:caso.nombre|escapejs }}';
+      var asunto = encodeURIComponent('Reporte financiero - ' + empresa);
+      var cuerpo = encodeURIComponent(
+        'Adjunto el reporte financiero de ' + empresa + ' generado con Contabilidad UNI.\n\n' +
+          'El archivo PDF se descarga desde el sistema. Adjuntalo a este correo antes de enviarlo.',
+      );
+      window.location.href = 'mailto:' + correo + '?subject=' + asunto + '&body=' + cuerpo;
+    });
+  </script>
+{% endblock %}

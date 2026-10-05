@@ -1,0 +1,82 @@
+{% extends "nucleo/base.html" %}
+{% load iconos formato_contable %}
+
+{% block contenido %}
+  {% include "nucleo/_cabecera_reporte.html" with titulo="Libro Mayor" %}
+
+  {% if not mayor.grupos %}
+    <div class="tarjeta">
+      <div class="tarjeta-cuerpo">
+        <div class="estado-vacio">
+          <h3>Sin movimientos</h3>
+          <p>El libro mayor se arma con los asientos del libro diario. Registra el primero.</p>
+          <a class="boton" href="{% url 'registrar_asiento' %}">Registrar asiento</a>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    {% for grupo in mayor.grupos %}
+      <div class="tarjeta">
+        <div class="tarjeta-cabecera">
+          <div>
+            <h2>{{ grupo.etiqueta }}</h2>
+            <div class="subtitulo">
+              {{ grupo.cuentas|length }} cuentas con movimiento ·
+              Debe {{ grupo.total_debe|numero }} · Haber {{ grupo.total_haber|numero }}
+            </div>
+          </div>
+        </div>
+        <div class="tarjeta-cuerpo">
+          {% for item in grupo.cuentas %}
+            <div class="cuenta-t">
+              <div class="cuenta-t-cabecera">
+                <span class="codigo">{{ item.cuenta.codigo }}</span>
+                <strong>{{ item.cuenta.nombre }}</strong>
+              </div>
+              <div class="tabla-envoltorio">
+                <table class="tabla">
+                  <thead>
+                    <tr>
+                      <th style="width: 110px">Fecha</th>
+                      <th style="width: 60px">N.º</th>
+                      <th>Glosa</th>
+                      <th class="numero" style="width: 120px">Debe</th>
+                      <th class="numero" style="width: 120px">Haber</th>
+                      <th class="numero" style="width: 130px">Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for movimiento in item.movimientos %}
+                      <tr>
+                        <td>{{ movimiento.fecha|fecha_pe }}</td>
+                        <td class="codigo">#{{ movimiento.numero }}</td>
+                        <td>{{ movimiento.glosa }}</td>
+                        <td class="numero debe">{{ movimiento.debe|numero_o_vacio }}</td>
+                        <td class="numero haber">{{ movimiento.haber|numero_o_vacio }}</td>
+                        <td class="numero">{{ movimiento.saldo|numero }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="3">Totales</td>
+                      <td class="numero">{{ item.total_debe|numero }}</td>
+                      <td class="numero">{{ item.total_haber|numero }}</td>
+                      <td class="numero">{{ item.saldo|numero }}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div class="cuenta-t-pie">
+                <span>
+                  Saldo {% if item.naturaleza_saldo == "DEUDOR" %}deudor{% else %}acreedor{% endif %}
+                </span>
+                <span>{{ item.saldo|numero }}</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endblock %}

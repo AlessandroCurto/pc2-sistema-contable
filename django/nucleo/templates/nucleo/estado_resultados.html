@@ -1,0 +1,112 @@
+{% extends "nucleo/base.html" %}
+{% load formato_contable %}
+
+{% block contenido %}
+  {% include "nucleo/_cabecera_reporte.html" with titulo="Estado de Resultados" %}
+
+  <div class="tarjeta">
+    <div class="tarjeta-cuerpo">
+      <div class="rejilla rejilla-4">
+        <div class="indicador">
+          <div class="etiqueta">Ventas netas</div>
+          <div class="valor">{{ estado.ventas_netas|moneda:simbolo }}</div>
+          <div class="pie">ventas menos devoluciones y descuentos</div>
+        </div>
+        <div class="indicador">
+          <div class="etiqueta">Utilidad bruta</div>
+          <div class="valor">{{ estado.utilidad_bruta|moneda:simbolo }}</div>
+          <div class="pie">ventas netas menos costo de ventas</div>
+        </div>
+        <div class="indicador">
+          <div class="etiqueta">Utilidad operativa</div>
+          <div class="valor">{{ estado.utilidad_operativa|moneda:simbolo }}</div>
+          <div class="pie">después de gastos de ventas y administración</div>
+        </div>
+        <div class="indicador">
+          <div class="etiqueta">Utilidad neta</div>
+          <div class="valor">{{ estado.utilidad_neta|moneda:simbolo }}</div>
+          <div class="pie">impuesto {{ estado.tasa_impuesto|floatformat }}%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Detalle del período</h2>
+        <div class="subtitulo">
+          Las líneas en cero no se muestran. La tasa del impuesto se cambia en Configuración.
+        </div>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo sin-espacio">
+      <div class="tabla-envoltorio">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th class="numero" style="width: 200px">Importe ({{ simbolo }})</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in estado.filas %}
+              {% if fila.clase != "detalle" or not fila.monto|es_cero %}
+                <tr class="{% if fila.clase == 'total' %}fila-total{% elif fila.clase == 'subtotal' %}fila-subtotal{% endif %}">
+                  <td>{% if fila.signo == "-" %}(-) {% endif %}{{ fila.etiqueta }}</td>
+                  <td class="numero">{{ fila.monto|numero }}</td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if estado.secciones %}
+    <div class="tarjeta">
+      <div class="tarjeta-cabecera">
+        <div>
+          <h2>Cuentas que forman cada línea</h2>
+          <div class="subtitulo">De dónde sale cada importe del estado de resultados.</div>
+        </div>
+      </div>
+      <div class="tarjeta-cuerpo sin-espacio">
+        <div class="tabla-envoltorio">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Rubro</th>
+                <th style="width: 110px">Código</th>
+                <th>Cuenta</th>
+                <th class="numero" style="width: 170px">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rubro, seccion in estado.secciones.items %}
+                {% if seccion.cuentas %}
+                  <tr class="fila-cabecera-grupo">
+                    <td colspan="4">{{ seccion.etiqueta }}</td>
+                  </tr>
+                  {% for detalle in seccion.cuentas %}
+                    <tr>
+                      <td></td>
+                      <td class="codigo">{{ detalle.cuenta.codigo }}</td>
+                      <td>{{ detalle.cuenta.nombre }}</td>
+                      <td class="numero">{{ detalle.monto|numero }}</td>
+                    </tr>
+                  {% endfor %}
+                  <tr class="fila-subtotal">
+                    <td colspan="3">Total {{ seccion.etiqueta|lower }}</td>
+                    <td class="numero">{{ seccion.total|numero }}</td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

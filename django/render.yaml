@@ -1,0 +1,29 @@
+# Despliegue en Render (plan gratuito). Sirve igual para Railway o Fly:
+# lo que importa es que haya un proceso vivo de Python, cosa que GitHub Pages
+# no puede dar porque solo entrega archivos.
+#
+# Pasos: entrar a render.com con la cuenta de GitHub, New > Blueprint, elegir
+# este repositorio. Render lee este archivo y levanta el servicio.
+#
+# Ojo con el plan gratuito: el disco se borra en cada despliegue, asi que la
+# base SQLite vuelve a quedar vacia. Para que los casos no se pierdan, agregar
+# un disco persistente (plan pago) o una base PostgreSQL.
+services:
+  - type: web
+    name: contabilidad-uni
+    runtime: python
+    plan: free
+    rootDir: django
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    startCommand: gunicorn contabilidad.wsgi --log-file -
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_HOSTS
+        value: ".onrender.com"
+      - key: DJANGO_CSRF_ORIGINS
+        value: "https://contabilidad-uni.onrender.com"

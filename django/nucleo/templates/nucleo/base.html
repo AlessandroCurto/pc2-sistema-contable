@@ -1,0 +1,102 @@
+{% load static iconos %}<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block titulo %}{% if entrada_actual %}{{ entrada_actual.etiqueta }} · {% endif %}Contabilidad UNI{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'nucleo/global.css' %}" />
+  </head>
+  <body>
+    {% include "nucleo/iconos.html" %}
+    <div class="aplicacion">
+      <aside class="menu-lateral no-imprimir" id="menu-lateral">
+        <div class="menu-marca">
+          <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="7" fill="#0a0a0a" />
+            <path d="M8 22V10h4v12zM14 22V14h4v8zM20 22v-6h4v6z" fill="#f2c200" />
+          </svg>
+          <div>
+            <strong>Contabilidad UNI</strong>
+            <span>Sistema Contable</span>
+          </div>
+        </div>
+
+        <div class="menu-caso">
+          Caso abierto
+          <strong>{% if caso_activo %}{{ caso_activo.nombre }}{% else %}Ninguno{% endif %}</strong>
+        </div>
+
+        {% for grupo in menu_grupos %}
+          <nav>
+            <div class="menu-grupo">{{ grupo.nombre }}</div>
+            {% for entrada in grupo.entradas %}
+              <a class="menu-enlace{% if entrada.ruta == ruta_actual %} activo{% endif %}" href="{% url entrada.ruta %}">
+                {% icono entrada.icono %}{{ entrada.etiqueta }}
+              </a>
+            {% endfor %}
+          </nav>
+        {% endfor %}
+
+        <div class="menu-pie">
+          Contabilidad UNI - Sistema Contable<br />
+          Los datos se guardan en este servidor (Django + SQLite).
+        </div>
+      </aside>
+
+      <div class="velo" id="velo" aria-hidden="true"></div>
+
+      <div class="contenido">
+        <header class="barra-superior">
+          <button type="button" class="boton-menu" id="boton-menu" aria-label="Abrir menú">
+            {% icono "menu" %}
+          </button>
+          <div>
+            <h1>{% block encabezado %}{% if entrada_actual %}{{ entrada_actual.etiqueta }}{% else %}Contabilidad UNI{% endif %}{% endblock %}</h1>
+            <div class="subtitulo">{% block subtitulo %}{% if entrada_actual %}{{ entrada_actual.descripcion }}{% else %}Sistema contable{% endif %}{% endblock %}</div>
+          </div>
+          {% block acciones_barra %}{% endblock %}
+        </header>
+
+        <main class="pagina">
+          {% if messages %}
+            {% for mensaje in messages %}
+              <div class="aviso {{ mensaje.tags }}">
+                {% if mensaje.level_tag == 'success' %}{% icono "check" %}{% elif mensaje.level_tag == 'error' %}{% icono "alerta" %}{% endif %}
+                <span>{{ mensaje }}</span>
+              </div>
+            {% endfor %}
+          {% endif %}
+          {% block contenido %}{% endblock %}
+        </main>
+      </div>
+    </div>
+
+    <script>
+      // Menú lateral en celular: el CSS ya trae .abierto y .velo.visible.
+      (function () {
+        var boton = document.getElementById('boton-menu');
+        var menu = document.getElementById('menu-lateral');
+        var velo = document.getElementById('velo');
+        function cerrar() {
+          menu.classList.remove('abierto');
+          velo.classList.remove('visible');
+        }
+        boton.addEventListener('click', function () {
+          menu.classList.toggle('abierto');
+          velo.classList.toggle('visible');
+        });
+        velo.addEventListener('click', cerrar);
+
+        // Confirmacion antes de borrar: el formulario trae data-confirmar.
+        document.querySelectorAll('form[data-confirmar]').forEach(function (formulario) {
+          formulario.addEventListener('submit', function (evento) {
+            if (!window.confirm(formulario.getAttribute('data-confirmar'))) {
+              evento.preventDefault();
+            }
+          });
+        });
+      })();
+    </script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

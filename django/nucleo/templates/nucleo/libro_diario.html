@@ -1,0 +1,112 @@
+{% extends "nucleo/base.html" %}
+{% load iconos formato_contable %}
+
+{% block contenido %}
+  {% include "nucleo/_cabecera_reporte.html" with titulo="Libro Diario" %}
+
+  <div class="tarjeta no-imprimir">
+    <div class="tarjeta-cabecera"><h2>Filtros</h2></div>
+    <div class="tarjeta-cuerpo">
+      <form method="get" class="filtros">
+        {% for campo in formulario %}
+          <div class="campo">
+            <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+            {{ campo }}
+            {% for error in campo.errors %}<span class="error">{{ error }}</span>{% endfor %}
+          </div>
+        {% endfor %}
+        <div class="lista-acciones">
+          <button class="boton" type="submit">Filtrar</button>
+          <a class="boton secundario" href="{% url 'libro_diario' %}">Limpiar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Asientos</h2>
+        <div class="subtitulo">
+          {{ diario.asientos|length }} de {{ total_asientos }} asientos
+          {% if filtrado %}(con filtros aplicados){% endif %}
+        </div>
+      </div>
+      <div class="acciones no-imprimir">
+        <a class="boton chico" href="{% url 'registrar_asiento' %}">{% icono "mas" 14 %} Nuevo asiento</a>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo sin-espacio">
+      {% if not diario.asientos %}
+        <div class="estado-vacio">
+          <h3>Sin asientos</h3>
+          <p>
+            {% if filtrado %}
+              Ningún asiento cumple los filtros. Prueba con otras fechas, otra cuenta u otro texto.
+            {% else %}
+              Registra el primer asiento del caso para ver el libro diario.
+            {% endif %}
+          </p>
+          <a class="boton" href="{% url 'registrar_asiento' %}">Registrar asiento</a>
+        </div>
+      {% else %}
+        <div class="tabla-envoltorio">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th style="width: 60px">N.º</th>
+                <th style="width: 110px">Fecha</th>
+                <th style="width: 110px">Código</th>
+                <th>Cuenta / Glosa</th>
+                <th class="numero" style="width: 130px">Debe</th>
+                <th class="numero" style="width: 130px">Haber</th>
+                <th class="no-imprimir" style="width: 90px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in diario.asientos %}
+                {% for fila in item.filas %}
+                  <tr>
+                    <td class="codigo">{% if fila.primera %}#{{ item.asiento.numero }}{% endif %}</td>
+                    <td>{% if fila.primera %}{{ item.asiento.fecha|fecha_pe }}{% endif %}</td>
+                    <td class="codigo">{{ fila.cuenta.codigo }}</td>
+                    <td>
+                      {{ fila.cuenta.nombre }}
+                      {% if fila.primera and item.asiento.glosa %}
+                        <br /><span class="atenuado">{{ item.asiento.glosa }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="numero debe">{{ fila.debe|numero_o_vacio }}</td>
+                    <td class="numero haber">{{ fila.haber|numero_o_vacio }}</td>
+                    <td class="no-imprimir">
+                      {% if fila.primera %}
+                        <form method="post" action="{% url 'asiento_eliminar' item.asiento.id %}" data-confirmar="Se eliminará el asiento. ¿Continuar?">
+                          {% csrf_token %}
+                          <button class="boton discreto chico" type="submit">{% icono "basura" 14 %}</button>
+                        </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+                <tr class="fila-subtotal">
+                  <td colspan="4">Totales del asiento #{{ item.asiento.numero }}</td>
+                  <td class="numero">{{ item.total_debe|numero }}</td>
+                  <td class="numero">{{ item.total_haber|numero }}</td>
+                  <td class="no-imprimir"></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4">TOTAL GENERAL</td>
+                <td class="numero">{{ diario.total_debe|numero }}</td>
+                <td class="numero">{{ diario.total_haber|numero }}</td>
+                <td class="no-imprimir"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

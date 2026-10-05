@@ -1,0 +1,28 @@
+{% load iconos formato_contable %}
+{% comment %}Cabecera de los reportes: empresa, RUC, período y moneda, más Imprimir.{% endcomment %}
+<header class="cabecera-reporte">
+  <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+    <div style="flex: 1; min-width: 220px">
+      <h2>{{ titulo }}</h2>
+      <div class="datos">
+        <span>{{ caso.razon_social|default:caso.nombre }}</span>
+        {% if caso.ruc %}<span>RUC {{ caso.ruc }}</span>{% endif %}
+        <span>
+          {% if caso.periodo_definido %}
+            Del {{ caso.periodo_inicio|fecha_pe }} al {{ caso.periodo_fin|fecha_pe }}
+          {% else %}
+            Período no definido
+          {% endif %}
+        </span>
+        <span>Expresado en {{ caso.simbolo_moneda }}</span>
+      </div>
+    </div>
+    <div class="lista-acciones no-imprimir">
+      <a class="boton secundario" href="{% url 'reporte_excel' %}">{% icono "excel" 16 %} Excel</a>
+      <a class="boton secundario" href="{% url 'reporte' %}">{% icono "pdf" 16 %} PDF</a>
+      <button type="button" class="boton secundario" onclick="window.print()">
+        {% icono "imprimir" 16 %} Imprimir
+      </button>
+    </div>
+  </div>
+</header>

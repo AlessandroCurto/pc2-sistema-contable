@@ -1,0 +1,68 @@
+{% extends "nucleo/base.html" %}
+{% load iconos %}
+
+{% block contenido %}
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Datos del caso</h2>
+        <div class="subtitulo">
+          Lo que aparece en la cabecera de los reportes y en el PDF. La tasa del impuesto a la renta
+          se aplica en el Estado de Resultados.
+        </div>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo">
+      <form method="post">
+        {% csrf_token %}
+        {% include "nucleo/_campos.html" with formulario=formulario %}
+        <div class="lista-acciones" style="margin-top: 16px">
+          <button class="boton" type="submit">{% icono "check" 16 %} Guardar</button>
+          <a class="boton secundario" href="{% url 'caso_exportar' caso.pk %}">
+            {% icono "descargar" 16 %} Respaldo JSON
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera"><h2>Cómo se usa cada dato</h2></div>
+    <div class="tarjeta-cuerpo">
+      <div class="tabla-envoltorio">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th style="width: 260px">Dato</th>
+              <th>Para qué sirve</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Razón social y RUC</td>
+              <td>Cabecera de los reportes, del PDF y del Excel.</td>
+            </tr>
+            <tr>
+              <td>Período</td>
+              <td>Sale en los reportes. No limita las fechas de los asientos.</td>
+            </tr>
+            <tr>
+              <td>Tasa del impuesto a la renta</td>
+              <td>
+                Se aplica al resultado antes de impuesto, solo si es positivo. Con 0 no se calcula
+                impuesto.
+              </td>
+            </tr>
+            <tr>
+              <td>El impuesto afecta al patrimonio</td>
+              <td>
+                Marcado, el Balance General muestra el resultado del ejercicio neto de impuesto. Sin
+                marcar, muestra el resultado antes de impuesto.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% load iconos %}
+<div class="tarjeta">
+  <div class="tarjeta-cuerpo">
+    <div class="estado-vacio">
+      <h3>{{ titulo }}</h3>
+      <p>{{ descripcion }}</p>
+      {% if url %}<a class="boton" href="{{ url }}">{{ texto_boton }}</a>{% endif %}
+    </div>
+  </div>
+</div>

@@ -1,0 +1,101 @@
+{% extends "nucleo/base.html" %}
+{% load iconos %}
+
+{% block contenido %}
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Asiento N.º {{ numero }}</h2>
+        <div class="subtitulo">
+          El asiento se guarda solo cuando el total del Debe es igual al total del Haber.
+        </div>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo">
+      <form method="post">
+        {% csrf_token %}
+        {% include "nucleo/_campos.html" with formulario=formulario %}
+
+        {{ formset.management_form }}
+        {% if formset.non_form_errors %}
+          <div class="aviso error" style="margin-top: 14px">
+            <span>
+              {% for error in formset.non_form_errors %}{{ error }}{% if not forloop.last %}<br />{% endif %}{% endfor %}
+            </span>
+          </div>
+        {% endif %}
+
+        <div class="tabla-envoltorio" style="margin-top: 16px">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Cuenta</th>
+                <th style="width: 150px">Debe</th>
+                <th style="width: 150px">Haber</th>
+                <th style="width: 150px">Signo</th>
+                <th style="width: 140px">Monto</th>
+                <th style="width: 70px">Quitar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for linea in formset.forms %}
+                <tr>
+                  <td>
+                    {{ linea.cuenta }}
+                    {% for campo in linea.hidden_fields %}{{ campo }}{% endfor %}
+                    {% for error in linea.non_field_errors %}<span class="error">{{ error }}</span>{% endfor %}
+                    {% for error in linea.cuenta.errors %}<span class="error">{{ error }}</span>{% endfor %}
+                  </td>
+                  <td>{{ linea.debe }}{% for error in linea.debe.errors %}<span class="error">{{ error }}</span>{% endfor %}</td>
+                  <td>{{ linea.haber }}{% for error in linea.haber.errors %}<span class="error">{{ error }}</span>{% endfor %}</td>
+                  <td>{{ linea.signo }}</td>
+                  <td>{{ linea.monto }}{% for error in linea.monto.errors %}<span class="error">{{ error }}</span>{% endfor %}</td>
+                  <td>{% if linea.DELETE %}{{ linea.DELETE }}{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="aviso info" style="margin-top: 14px">
+          <span>
+            Dos formas de llenar la línea, como en las clases: escribir el importe en Debe o en
+            Haber, o elegir el signo (+ aumenta, - disminuye) y el monto. Con el signo, el sistema
+            decide el lado según el tipo de la cuenta.
+          </span>
+        </div>
+
+        <div class="lista-acciones" style="margin-top: 16px">
+          <button class="boton" type="submit">{% icono "check" 16 %} Guardar asiento</button>
+          <a class="boton secundario" href="{% url 'libro_diario' %}">Ver libro diario</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Importar asientos desde Excel o CSV</h2>
+        <div class="subtitulo">
+          Columnas: numero, fecha, glosa, codigo, debe, haber. Las lee pandas y cada asiento pasa
+          por la misma revisión de Debe = Haber.
+        </div>
+      </div>
+      <div class="acciones">
+        <a class="boton secundario chico" href="{% url 'plantilla_asientos' %}">
+          {% icono "descargar" 14 %} Plantilla
+        </a>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo">
+      <form method="post" action="{% url 'asientos_importar' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% include "nucleo/_campos.html" with formulario=formulario_importar %}
+        <div class="lista-acciones" style="margin-top: 14px">
+          <button class="boton secundario" type="submit">{% icono "subir" 16 %} Importar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

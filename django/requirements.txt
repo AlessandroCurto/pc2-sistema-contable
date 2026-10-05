@@ -1,0 +1,6 @@
+Django==5.2.17
+reportlab==5.0.1
+pandas==3.0.6
+openpyxl==3.1.5
+whitenoise==6.12.0
+gunicorn==23.0.0

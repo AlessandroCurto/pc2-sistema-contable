@@ -1,0 +1,19 @@
+{% comment %}Dibuja los campos de un formulario con la misma pinta que la version web.{% endcomment %}
+{% if formulario.non_field_errors %}
+  <div class="aviso error">
+    <span>
+      {% for error in formulario.non_field_errors %}{{ error }}{% if not forloop.last %}<br />{% endif %}{% endfor %}
+    </span>
+  </div>
+{% endif %}
+<div class="fila-campos">
+  {% for campo in formulario.visible_fields %}
+    <div class="campo">
+      <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+      {{ campo }}
+      {% if campo.help_text %}<span class="ayuda">{{ campo.help_text }}</span>{% endif %}
+      {% for error in campo.errors %}<span class="error">{{ error }}</span>{% endfor %}
+    </div>
+  {% endfor %}
+</div>
+{% for campo in formulario.hidden_fields %}{{ campo }}{% endfor %}

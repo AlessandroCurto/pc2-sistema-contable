@@ -1,0 +1,136 @@
+{% extends "nucleo/base.html" %}
+{% load iconos formato_contable %}
+
+{% block contenido %}
+  {% include "nucleo/_cabecera_reporte.html" with titulo="Balance General" %}
+
+  <div class="tarjeta">
+    <div class="tarjeta-cuerpo">
+      <div class="ecuacion">
+        <strong>Ecuación contable</strong>
+        {{ general.total_activo|numero }} = {{ general.total_pasivo|numero }} +
+        {{ general.total_patrimonio|numero }}
+      </div>
+      <div class="lista-acciones" style="justify-content: center">
+        <span class="marca-cuadre {% if general.cuadrado %}ok{% else %}mal{% endif %}">
+          {% if general.cuadrado %}
+            {% icono "check" 16 %} Sí cumple: Total Activo = Total Pasivo + Total Patrimonio.
+          {% else %}
+            {% icono "alerta" 16 %} No cierra: diferencia de {{ general.diferencia|numero }}.
+          {% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="rejilla rejilla-2">
+    <div class="tarjeta">
+      <div class="bloque-titulo">Activo</div>
+      <div class="tarjeta-cuerpo sin-espacio">
+        <div class="tabla-envoltorio">
+          <table class="tabla">
+            <tbody>
+              {% for bloque in bloques_activo %}
+                {% if bloque.cuentas %}
+                  <tr class="fila-cabecera-grupo">
+                    <td colspan="3">{{ bloque.etiqueta }}</td>
+                  </tr>
+                  {% for detalle in bloque.cuentas %}
+                    <tr>
+                      <td class="codigo" style="width: 110px">{{ detalle.cuenta.codigo }}</td>
+                      <td>{{ detalle.cuenta.nombre }}</td>
+                      <td class="numero" style="width: 160px">{{ detalle.monto|numero }}</td>
+                    </tr>
+                  {% endfor %}
+                  <tr class="fila-subtotal">
+                    <td colspan="2">Total {{ bloque.etiqueta|lower }}</td>
+                    <td class="numero">{{ bloque.total|numero }}</td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2">TOTAL ACTIVO</td>
+                <td class="numero">{{ general.total_activo|numero }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="bloque-titulo pasivo">Pasivo</div>
+      <div class="tarjeta-cuerpo sin-espacio">
+        <div class="tabla-envoltorio">
+          <table class="tabla">
+            <tbody>
+              {% for bloque in bloques_pasivo %}
+                {% if bloque.cuentas %}
+                  <tr class="fila-cabecera-grupo">
+                    <td colspan="3">{{ bloque.etiqueta }}</td>
+                  </tr>
+                  {% for detalle in bloque.cuentas %}
+                    <tr>
+                      <td class="codigo" style="width: 110px">{{ detalle.cuenta.codigo }}</td>
+                      <td>{{ detalle.cuenta.nombre }}</td>
+                      <td class="numero" style="width: 160px">{{ detalle.monto|numero }}</td>
+                    </tr>
+                  {% endfor %}
+                  <tr class="fila-subtotal">
+                    <td colspan="2">Total {{ bloque.etiqueta|lower }}</td>
+                    <td class="numero">{{ bloque.total|numero }}</td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2">TOTAL PASIVO</td>
+                <td class="numero">{{ general.total_pasivo|numero }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="bloque-titulo patrimonio">Patrimonio</div>
+      <div class="tarjeta-cuerpo sin-espacio">
+        <div class="tabla-envoltorio">
+          <table class="tabla">
+            <tbody>
+              {% for detalle in general.patrimonio.cuentas %}
+                <tr>
+                  <td class="codigo" style="width: 110px">{{ detalle.cuenta.codigo }}</td>
+                  <td>{{ detalle.cuenta.nombre }}</td>
+                  <td class="numero" style="width: 160px">{{ detalle.monto|numero }}</td>
+                </tr>
+              {% endfor %}
+              <tr>
+                <td></td>
+                <td>
+                  Resultado del ejercicio
+                  <span class="atenuado">
+                    ({% if general.resultado_neto_de_impuesto %}neto de impuesto{% else %}antes de impuesto{% endif %})
+                  </span>
+                </td>
+                <td class="numero">{{ general.resultado_ejercicio|numero }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2">TOTAL PATRIMONIO</td>
+                <td class="numero">{{ general.total_patrimonio|numero }}</td>
+              </tr>
+              <tr>
+                <td colspan="2">TOTAL PASIVO + PATRIMONIO</td>
+                <td class="numero">{{ general.total_pasivo_patrimonio|numero }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "nucleo/base.html" %}
+{% load iconos formato_contable %}
+
+{% block contenido %}
+  <div class="tarjeta">
+    <div class="tarjeta-cabecera">
+      <div>
+        <h2>Casos guardados</h2>
+        <div class="subtitulo">Un caso reúne la empresa, su plan de cuentas y sus asientos.</div>
+      </div>
+    </div>
+    <div class="tarjeta-cuerpo sin-espacio">
+      {% if not lista %}
+        <div class="estado-vacio">
+          <h3>Todavía no hay casos</h3>
+          <p>Crea uno nuevo con el formulario de abajo o carga un caso de ejemplo para probar el sistema.</p>
+        </div>
+      {% else %}
+        <div class="tabla-envoltorio">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Caso</th>
+                <th>Empresa</th>
+                <th class="numero">Cuentas</th>
+                <th class="numero">Asientos</th>
+                <th>Período</th>
+                <th style="width: 250px">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in lista %}
+                <tr>
+                  <td>
+                    <strong>{{ item.nombre }}</strong>
+                    {% if caso_activo and item.pk == caso_activo.pk %}
+                      <br /><span class="atenuado">Abierto ahora</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ item.razon_social }}
+                    {% if item.ruc %}<br /><span class="atenuado codigo">RUC {{ item.ruc }}</span>{% endif %}
+                  </td>
+                  <td class="numero">{{ item.cuentas.count }}</td>
+                  <td class="numero">{{ item.asientos.count }}</td>
+                  <td>
+                    {% if item.periodo_definido %}
+                      {{ item.periodo_inicio|fecha_pe }} al {{ item.periodo_fin|fecha_pe }}
+                    {% else %}
+                      <span class="atenuado">Sin definir</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="lista-acciones">
+                      <form method="post" action="{% url 'caso_abrir' item.pk %}">
+                        {% csrf_token %}
+                        <button class="boton chico" type="submit">Abrir</button>
+                      </form>
+                      <a class="boton secundario chico" href="{% url 'caso_exportar' item.pk %}">
+                        {% icono "descargar" 14 %} JSON
+                      </a>
+                      <form method="post" action="{% url 'caso_eliminar' item.pk %}" data-confirmar="Se borrará este caso con sus cuentas y asientos. ¿Continuar?">
+                        {% csrf_token %}
+                        <button class="boton peligro chico" type="submit">{% icono "basura" 14 %} Eliminar</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="rejilla rejilla-2">
+    <div class="tarjeta">
+      <div class="tarjeta-cabecera"><h2>Caso nuevo</h2></div>
+      <div class="tarjeta-cuerpo">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="nuevo" />
+          {% include "nucleo/_campos.html" with formulario=formulario %}
+          <div class="lista-acciones" style="margin-top: 14px">
+            <button class="boton" type="submit">{% icono "mas" 16 %} Crear y abrir</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta-cabecera"><h2>Caso de ejemplo y respaldos</h2></div>
+      <div class="tarjeta-cuerpo">
+        <p class="atenuado" style="font-size: 13px">
+          Los dos casos de las clases, con sus cuentas y asientos ya cargados. Sirven para ver cómo
+          queda cada reporte antes de escribir el caso del profesor.
+        </p>
+        <form method="post" action="{% url 'caso_demo' %}" style="margin-top: 12px">
+          {% csrf_token %}
+          {% include "nucleo/_campos.html" with formulario=formulario_demo %}
+          <div class="lista-acciones" style="margin-top: 14px">
+            <button class="boton secundario" type="submit">Cargar ejemplo</button>
+          </div>
+        </form>
+
+        <hr style="margin: 18px 0; border: none; border-top: 1px solid var(--gris-200)" />
+
+        <h3 style="font-size: 14px; margin-bottom: 8px">Importar un respaldo</h3>
+        <form method="post" action="{% url 'caso_importar' %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          {% include "nucleo/_campos.html" with formulario=formulario_importar %}
+          <div class="lista-acciones" style="margin-top: 14px">
+            <button class="boton secundario" type="submit">{% icono "subir" 16 %} Importar JSON</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -9,6 +9,18 @@ El sistema es **genérico**: no tiene ningún caso escrito en el código. La emp
 de cuentas, el período y la tasa del impuesto a la renta se cargan desde la interfaz, así
 que sirve para cualquier enunciado.
 
+## Dos versiones del mismo sistema
+
+| Versión | Carpeta | Cómo se usa |
+| --- | --- | --- |
+| React + TypeScript (la publicada) | raíz del repositorio | página estática en GitHub Pages, sin servidor |
+| Python + Django | [`django/`](django/README.md) | `manage.py runserver` en la computadora, o un hosting de Python |
+
+Las dos calculan lo mismo y dan las mismas cifras. La de Django no puede vivir en
+GitHub Pages porque Pages solo entrega archivos y Django necesita un proceso de
+Python corriendo; en cambio agrega el reporte en Excel con pandas y la
+importación de asientos desde una hoja de cálculo.
+
 ## Cómo se usa (ruta rápida para probarlo)
 
 1. Abrir la aplicación.

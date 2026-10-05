@@ -1,0 +1,139 @@
+{% extends "nucleo/base.html" %}
+{% load iconos formato_contable %}
+
+{% block contenido %}
+  {% if not caso %}
+    <div class="tarjeta">
+      <div class="tarjeta-cuerpo">
+        <div class="estado-vacio">
+          <h3>Bienvenido a Contabilidad UNI</h3>
+          <p>
+            {% if not casos %}
+              Crea un caso con la empresa del enunciado, registra sus asientos y el sistema arma el
+              libro diario, el libro mayor, el balance de comprobación, el estado de resultados y el
+              balance general.
+            {% else %}
+              Tienes casos guardados, pero ninguno abierto. Abre uno desde la pantalla de Casos.
+            {% endif %}
+          </p>
+          <a class="boton" href="{% url 'casos' %}">{% icono "casos" 16 %} Ir a Casos</a>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="tarjeta">
+      <div class="tarjeta-cabecera">
+        <div>
+          <h2>{{ dominio.empresa.nombre }}</h2>
+          <div class="subtitulo">
+            {% if caso.periodo_definido %}
+              Período del {{ caso.periodo_inicio|fecha_pe }} al {{ caso.periodo_fin|fecha_pe }}
+            {% else %}
+              Define el período en Configuración para que aparezca en los reportes.
+            {% endif %}
+          </div>
+        </div>
+        <div class="acciones">
+          <a class="boton secundario" href="{% url 'casos' %}">Cambiar de caso</a>
+        </div>
+      </div>
+      <div class="tarjeta-cuerpo">
+        <div class="rejilla rejilla-4">
+          <div class="indicador">
+            <div class="etiqueta">Cuentas</div>
+            <div class="valor">{{ total_cuentas }}</div>
+            <div class="pie">en el plan de cuentas</div>
+          </div>
+          <div class="indicador">
+            <div class="etiqueta">Asientos</div>
+            <div class="valor">{{ total_asientos }}</div>
+            <div class="pie">en el libro diario</div>
+          </div>
+          <div class="indicador">
+            <div class="etiqueta">Total movido</div>
+            <div class="valor">{{ balance.total_debe|moneda:dominio.empresa.simbolo_moneda }}</div>
+            <div class="pie">suma del Debe</div>
+          </div>
+          <div class="indicador">
+            <div class="etiqueta">Utilidad neta</div>
+            <div class="valor">{{ estado.utilidad_neta|moneda:dominio.empresa.simbolo_moneda }}</div>
+            <div class="pie">impuesto {{ estado.tasa_impuesto|floatformat }}%</div>
+          </div>
+        </div>
+
+        {% if total_asientos %}
+          <div class="lista-acciones" style="margin-top: 16px">
+            <span class="marca-cuadre {% if balance.cuadrado %}ok{% else %}mal{% endif %}">
+              {% if balance.cuadrado %}{% icono "check" 16 %} Balance de comprobación cuadrado.
+              {% else %}{% icono "alerta" 16 %} Balance de comprobación descuadrado.{% endif %}
+            </span>
+            <span class="marca-cuadre {% if general.cuadrado %}ok{% else %}mal{% endif %}">
+              {% if general.cuadrado %}{% icono "check" 16 %} Ecuación contable verificada: Activo = Pasivo + Patrimonio.
+              {% else %}{% icono "alerta" 16 %} La ecuación contable no cierra.{% endif %}
+            </span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta-cabecera"><h2>Acciones rápidas</h2></div>
+      <div class="tarjeta-cuerpo">
+        <div class="rejilla-accesos">
+          {% for acceso in accesos %}
+            <a class="acceso centrado" href="{% url acceso.ruta %}">
+              <span class="acceso-icono">{% icono acceso.icono 22 %}</span>
+              <span>
+                <strong>{{ acceso.etiqueta }}</strong>
+                <span>{{ acceso.descripcion }}</span>
+              </span>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta-cabecera">
+        <h2>Últimos asientos registrados</h2>
+        <div class="acciones">
+          <a class="boton secundario chico" href="{% url 'libro_diario' %}">Ver libro diario</a>
+        </div>
+      </div>
+      <div class="tarjeta-cuerpo sin-espacio">
+        {% if not ultimos %}
+          <div class="estado-vacio">
+            <h3>Sin asientos todavía</h3>
+            <p>Registra el primer asiento para ver aquí el movimiento del caso.</p>
+            <a class="boton" href="{% url 'registrar_asiento' %}">Registrar asiento</a>
+          </div>
+        {% else %}
+          <div class="tabla-envoltorio">
+            <table class="tabla">
+              <thead>
+                <tr>
+                  <th style="width: 70px">N.º</th>
+                  <th style="width: 120px">Fecha</th>
+                  <th>Glosa</th>
+                  <th class="numero" style="width: 90px">Líneas</th>
+                  <th class="numero" style="width: 180px">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in ultimos %}
+                  <tr>
+                    <td class="codigo">#{{ item.asiento.numero }}</td>
+                    <td>{{ item.asiento.fecha|fecha_pe }}</td>
+                    <td>{% if item.asiento.glosa %}{{ item.asiento.glosa }}{% else %}<span class="atenuado">Sin glosa</span>{% endif %}</td>
+                    <td class="numero">{{ item.asiento.lineas|length }}</td>
+                    <td class="numero">{{ item.resumen.total_debe|moneda:dominio.empresa.simbolo_moneda }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
