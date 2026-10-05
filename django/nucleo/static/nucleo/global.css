@@ -30,7 +30,6 @@
   --radio-chico: 6px;
   --sombra: 0 1px 2px rgba(15, 39, 68, 0.06), 0 6px 18px rgba(15, 39, 68, 0.06);
   --sombra-fuerte: 0 10px 40px rgba(15, 39, 68, 0.22);
-  --ancho-menu: 250px;
 
   --fuente: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   --fuente-numeros: 'Consolas', 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
@@ -80,127 +79,6 @@ button {
 
 /* ---------- Disposición general ---------- */
 
-.aplicacion {
-  display: flex;
-  min-height: 100%;
-}
-
-.menu-lateral {
-  width: var(--ancho-menu);
-  flex: 0 0 var(--ancho-menu);
-  background: var(--azul-900);
-  color: #d8d8d8;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
-
-.menu-marca {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.menu-marca strong {
-  display: block;
-  font-size: 17px;
-  color: #fff;
-  letter-spacing: 0.2px;
-}
-
-.menu-marca span {
-  font-size: 11.5px;
-  color: #9a9a9a;
-}
-
-.menu-caso {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 12px;
-  color: #9a9a9a;
-}
-
-.menu-caso strong {
-  display: block;
-  color: #fff;
-  font-size: 14px;
-  margin-top: 2px;
-  word-break: break-word;
-}
-
-.menu-grupo {
-  padding: 14px 16px 4px;
-  font-size: 10.5px;
-  letter-spacing: 0.9px;
-  text-transform: uppercase;
-  color: #7a7a7a;
-}
-
-.menu-enlace {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 16px;
-  color: #d6d6d6;
-  text-decoration: none;
-  font-size: 14px;
-  border-left: 3px solid transparent;
-}
-
-.menu-enlace:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: #fff;
-}
-
-.menu-enlace.activo {
-  background: rgba(242, 194, 0, 0.18);
-  border-left-color: var(--amarillo);
-  color: #fff;
-  font-weight: 600;
-}
-
-.menu-pie {
-  margin-top: auto;
-  padding: 14px 16px;
-  font-size: 11px;
-  color: #7a7a7a;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.contenido {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.barra-superior {
-  background: var(--blanco);
-  border-bottom: 1px solid var(--gris-200);
-  padding: 14px 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-
-.barra-superior h1 {
-  font-size: 20px;
-}
-
-.barra-superior .subtitulo {
-  font-size: 12.5px;
-  color: var(--gris-500);
-  margin-top: 2px;
-}
-
 .barra-acciones {
   margin-left: auto;
   display: flex;
@@ -215,19 +93,6 @@ button {
   gap: 18px;
   max-width: 1400px;
   width: 100%;
-}
-
-.boton-menu {
-  display: none;
-  background: var(--blanco);
-  border: 1px solid var(--gris-300);
-  border-radius: var(--radio-chico);
-  padding: 7px 10px;
-  cursor: pointer;
-}
-
-.velo {
-  display: none;
 }
 
 /* ---------- Tarjetas ---------- */
@@ -1013,47 +878,14 @@ textarea {
 /* ---------- Celular ---------- */
 
 @media (max-width: 900px) {
-  .menu-lateral {
-    position: fixed;
-    z-index: 120;
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
-  }
-
-  .menu-lateral.abierto {
-    transform: none;
-  }
-
-  .boton-menu {
-    display: inline-flex;
-  }
-
-  .velo.visible {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(10, 24, 42, 0.45);
-    z-index: 110;
-  }
-
   .pagina {
     padding: 16px 14px 56px;
-  }
-
-  .barra-superior {
-    padding: 12px 14px;
-  }
-
-  .barra-superior h1 {
-    font-size: 17px;
   }
 }
 
 /* ---------- Impresión ---------- */
 
 @media print {
-  .menu-lateral,
-  .barra-superior,
   .pila-avisos,
   .no-imprimir {
     display: none !important;

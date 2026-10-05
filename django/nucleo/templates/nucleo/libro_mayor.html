@@ -1,6 +1,9 @@
 {% extends "nucleo/base.html" %}
 {% load iconos formato_contable %}
 
+{# La banda negra del reporte ya trae el titulo: sin encabezado blanco. #}
+{% block encabezado_pagina %}{% endblock %}
+
 {% block contenido %}
   {% include "nucleo/_cabecera_reporte.html" with titulo="Libro Mayor" %}
 

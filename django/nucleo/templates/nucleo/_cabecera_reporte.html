@@ -3,7 +3,14 @@
 <header class="cabecera-reporte">
   <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
     <div style="flex: 1; min-width: 220px">
-      <h2>{{ titulo }}</h2>
+      {% if entrada_actual %}
+        <div class="migas migas-reporte">
+          <span>{{ entrada_actual.grupo }}</span>
+          {% icono "chevron" 12 "icono migas-separador" %}
+          <span aria-current="page">{{ entrada_actual.etiqueta }}</span>
+        </div>
+      {% endif %}
+      <h1>{{ titulo }}</h1>
       <div class="datos">
         <span>{{ caso.razon_social|default:caso.nombre }}</span>
         {% if caso.ruc %}<span>RUC {{ caso.ruc }}</span>{% endif %}

@@ -97,6 +97,24 @@ MENU: List[EntradaMenu] = [
 
 GRUPOS_MENU = ["Principal", "Operaciones", "Reportes", "Descargas", "Sistema"]
 
+#: Icono y frase de cada grupo: los usa la barra superior, donde cada grupo es
+#: un boton desplegable.
+ICONO_GRUPO = {
+    "Principal": "inicio",
+    "Operaciones": "asiento",
+    "Reportes": "resultados",
+    "Descargas": "descargar",
+    "Sistema": "ajustes",
+}
+
+DESCRIPCION_GRUPO = {
+    "Principal": "Resumen y casos guardados",
+    "Operaciones": "Cuentas y asientos del caso",
+    "Reportes": "Libros y estados financieros",
+    "Descargas": "PDF y Excel del caso",
+    "Sistema": "Empresa, período e impuesto",
+}
+
 ACCESOS_RAPIDOS = [
     "plan_cuentas",
     "registrar_asiento",

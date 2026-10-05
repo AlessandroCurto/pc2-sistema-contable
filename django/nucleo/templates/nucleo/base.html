@@ -4,99 +4,139 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block titulo %}{% if entrada_actual %}{{ entrada_actual.etiqueta }} · {% endif %}Contabilidad UNI{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'nucleo/favicon.svg' %}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap"
+    />
     <link rel="stylesheet" href="{% static 'nucleo/global.css' %}" />
+    <link rel="stylesheet" href="{% static 'nucleo/navegacion.css' %}" />
+    <script defer src="{% static 'nucleo/navegacion.js' %}"></script>
   </head>
   <body>
     {% include "nucleo/iconos.html" %}
-    <div class="aplicacion">
-      <aside class="menu-lateral no-imprimir" id="menu-lateral">
-        <div class="menu-marca">
-          <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
-            <rect width="32" height="32" rx="7" fill="#0a0a0a" />
-            <path d="M8 22V10h4v12zM14 22V14h4v8zM20 22v-6h4v6z" fill="#f2c200" />
+    <a class="saltar-contenido" href="#contenido">Saltar al contenido</a>
+
+    <header class="nav no-imprimir" data-nav>
+      <div class="nav-interior">
+        <a class="nav-marca" href="{% url 'inicio' %}" aria-label="Contabilidad UNI, ir a Inicio">
+          <svg class="nav-logo" width="34" height="34" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="#f2c200" />
+            <path d="M8 22V10h4v12zM14 22V14h4v8zM20 22v-6h4v6z" fill="#0a0a0a" />
           </svg>
-          <div>
+          <span class="nav-marca-texto">
             <strong>Contabilidad UNI</strong>
-            <span>Sistema Contable</span>
-          </div>
-        </div>
+            <span>Sistema contable</span>
+          </span>
+        </a>
 
-        <div class="menu-caso">
-          Caso abierto
-          <strong>{% if caso_activo %}{{ caso_activo.nombre }}{% else %}Ninguno{% endif %}</strong>
-        </div>
+        <nav class="nav-grupos" id="nav-grupos" aria-label="Secciones del sistema">
+          <ul class="nav-lista">
+            {% for grupo in menu_grupos %}
+              <li class="nav-grupo{% if grupo.activo %} actual{% endif %}" data-grupo>
+                <button
+                  type="button"
+                  class="nav-disparador"
+                  id="disparador-{{ forloop.counter }}"
+                  aria-expanded="false"
+                  aria-controls="panel-{{ forloop.counter }}"
+                >
+                  {% icono grupo.icono 18 "icono nav-disparador-icono" %}
+                  <span>{{ grupo.nombre }}</span>
+                  {% icono "chevron" 15 "icono nav-chevron" %}
+                </button>
 
-        {% for grupo in menu_grupos %}
-          <nav>
-            <div class="menu-grupo">{{ grupo.nombre }}</div>
-            {% for entrada in grupo.entradas %}
-              <a class="menu-enlace{% if entrada.ruta == ruta_actual %} activo{% endif %}" href="{% url entrada.ruta %}">
-                {% icono entrada.icono %}{{ entrada.etiqueta }}
-              </a>
+                <div
+                  class="nav-panel{% if grupo.entradas|length > 3 %} nav-panel-ancho{% endif %}"
+                  id="panel-{{ forloop.counter }}"
+                  aria-labelledby="disparador-{{ forloop.counter }}"
+                >
+                  <div class="nav-panel-cabecera">
+                    <span class="nav-panel-titulo">{{ grupo.nombre }}</span>
+                    <span class="nav-panel-descripcion">{{ grupo.descripcion }}</span>
+                  </div>
+                  <ul class="nav-items">
+                    {% for entrada in grupo.entradas %}
+                      <li style="--i: {{ forloop.counter0 }}">
+                        <a
+                          class="nav-item{% if entrada.ruta == ruta_actual %} actual{% endif %}"
+                          href="{% url entrada.ruta %}"
+                          {% if entrada.ruta == ruta_actual %}aria-current="page"{% endif %}
+                        >
+                          <span class="nav-item-icono">{% icono entrada.icono 19 %}</span>
+                          <span class="nav-item-texto">
+                            <strong>{{ entrada.etiqueta }}</strong>
+                            <span>{{ entrada.descripcion }}</span>
+                          </span>
+                          {% icono "flecha" 16 "icono nav-item-flecha" %}
+                        </a>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </li>
             {% endfor %}
-          </nav>
-        {% endfor %}
+          </ul>
+        </nav>
 
-        <div class="menu-pie">
-          Contabilidad UNI - Sistema Contable<br />
-          Los datos se guardan en este servidor (Django + SQLite).
-        </div>
-      </aside>
+        <a class="nav-caso" href="{% url 'casos' %}" title="Cambiar de caso">
+          <span class="nav-caso-punto{% if not caso_activo %} vacio{% endif %}" aria-hidden="true"></span>
+          <span class="nav-caso-texto">
+            <span>Caso abierto</span>
+            <strong>{% if caso_activo %}{{ caso_activo.nombre }}{% else %}Ninguno{% endif %}</strong>
+          </span>
+        </a>
 
-      <div class="velo" id="velo" aria-hidden="true"></div>
-
-      <div class="contenido">
-        <header class="barra-superior">
-          <button type="button" class="boton-menu" id="boton-menu" aria-label="Abrir menú">
-            {% icono "menu" %}
-          </button>
-          <div>
-            <h1>{% block encabezado %}{% if entrada_actual %}{{ entrada_actual.etiqueta }}{% else %}Contabilidad UNI{% endif %}{% endblock %}</h1>
-            <div class="subtitulo">{% block subtitulo %}{% if entrada_actual %}{{ entrada_actual.descripcion }}{% else %}Sistema contable{% endif %}{% endblock %}</div>
-          </div>
-          {% block acciones_barra %}{% endblock %}
-        </header>
-
-        <main class="pagina">
-          {% if messages %}
-            {% for mensaje in messages %}
-              <div class="aviso {{ mensaje.tags }}">
-                {% if mensaje.level_tag == 'success' %}{% icono "check" %}{% elif mensaje.level_tag == 'error' %}{% icono "alerta" %}{% endif %}
-                <span>{{ mensaje }}</span>
-              </div>
-            {% endfor %}
-          {% endif %}
-          {% block contenido %}{% endblock %}
-        </main>
+        <button
+          type="button"
+          class="nav-hamburguesa"
+          aria-label="Abrir menú"
+          aria-expanded="false"
+          aria-controls="nav-grupos"
+          data-hamburguesa
+        >
+          <span class="nav-hamburguesa-lineas" aria-hidden="true"><span></span><span></span><span></span></span>
+        </button>
       </div>
-    </div>
+    </header>
 
-    <script>
-      // Menú lateral en celular: el CSS ya trae .abierto y .velo.visible.
-      (function () {
-        var boton = document.getElementById('boton-menu');
-        var menu = document.getElementById('menu-lateral');
-        var velo = document.getElementById('velo');
-        function cerrar() {
-          menu.classList.remove('abierto');
-          velo.classList.remove('visible');
-        }
-        boton.addEventListener('click', function () {
-          menu.classList.toggle('abierto');
-          velo.classList.toggle('visible');
-        });
-        velo.addEventListener('click', cerrar);
+    {% block encabezado_pagina %}
+    <section class="encabezado-pagina">
+      <div class="encabezado-interior">
+        <div class="encabezado-texto">
+          {% if entrada_actual %}
+            <div class="migas" aria-label="Ubicación">
+              <span>{{ entrada_actual.grupo }}</span>
+              {% icono "chevron" 12 "icono migas-separador" %}
+              <span aria-current="page">{{ entrada_actual.etiqueta }}</span>
+            </div>
+          {% endif %}
+          <h1>{% block encabezado %}{% if entrada_actual %}{{ entrada_actual.etiqueta }}{% else %}Contabilidad UNI{% endif %}{% endblock %}</h1>
+          <p class="subtitulo">{% block subtitulo %}{% if entrada_actual %}{{ entrada_actual.descripcion }}{% else %}Sistema contable{% endif %}{% endblock %}</p>
+        </div>
+        <div class="encabezado-acciones no-imprimir">{% block acciones_barra %}{% endblock %}</div>
+      </div>
+    </section>
+    {% endblock %}
 
-        // Confirmacion antes de borrar: el formulario trae data-confirmar.
-        document.querySelectorAll('form[data-confirmar]').forEach(function (formulario) {
-          formulario.addEventListener('submit', function (evento) {
-            if (!window.confirm(formulario.getAttribute('data-confirmar'))) {
-              evento.preventDefault();
-            }
-          });
-        });
-      })();
-    </script>
+    <main class="pagina" id="contenido" tabindex="-1">
+      {% if messages %}
+        {% for mensaje in messages %}
+          <div class="aviso {{ mensaje.tags }}" role="status">
+            {% if mensaje.level_tag == 'success' %}{% icono "check" %}{% elif mensaje.level_tag == 'error' %}{% icono "alerta" %}{% endif %}
+            <span>{{ mensaje }}</span>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% block contenido %}{% endblock %}
+    </main>
+
+    <footer class="pie no-imprimir">
+      Contabilidad UNI · Sistema contable · Django + SQLite
+    </footer>
+
     {% block scripts %}{% endblock %}
   </body>
 </html>
