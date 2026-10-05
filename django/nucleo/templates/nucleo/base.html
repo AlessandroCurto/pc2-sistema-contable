@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block titulo %}{% if entrada_actual %}{{ entrada_actual.etiqueta }} · {% endif %}Contabilidad UNI{% endblock %}</title>
+    <title>{% block titulo %}{% if entrada_actual %}{{ entrada_actual.etiqueta }} · {% endif %}Sistema y Gestión Financiera{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{% static 'nucleo/favicon.svg' %}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,14 +21,13 @@
 
     <header class="nav no-imprimir" data-nav>
       <div class="nav-interior">
-        <a class="nav-marca" href="{% url 'inicio' %}" aria-label="Contabilidad UNI, ir a Inicio">
+        <a class="nav-marca" href="{% url 'inicio' %}" aria-label="Sistema y Gestión Financiera, ir a Inicio">
           <svg class="nav-logo" width="34" height="34" viewBox="0 0 32 32" aria-hidden="true">
             <rect width="32" height="32" rx="8" fill="#f2c200" />
             <path d="M8 22V10h4v12zM14 22V14h4v8zM20 22v-6h4v6z" fill="#0a0a0a" />
           </svg>
           <span class="nav-marca-texto">
-            <strong>Contabilidad UNI</strong>
-            <span>Sistema contable</span>
+            <strong>Sistema y Gestión Financiera</strong>
           </span>
         </a>
 
@@ -113,8 +112,8 @@
               <span aria-current="page">{{ entrada_actual.etiqueta }}</span>
             </div>
           {% endif %}
-          <h1>{% block encabezado %}{% if entrada_actual %}{{ entrada_actual.etiqueta }}{% else %}Contabilidad UNI{% endif %}{% endblock %}</h1>
-          <p class="subtitulo">{% block subtitulo %}{% if entrada_actual %}{{ entrada_actual.descripcion }}{% else %}Sistema contable{% endif %}{% endblock %}</p>
+          <h1>{% block encabezado %}{% if entrada_actual %}{{ entrada_actual.etiqueta }}{% else %}Sistema y Gestión Financiera{% endif %}{% endblock %}</h1>
+          <p class="subtitulo">{% block subtitulo %}{% if entrada_actual %}{{ entrada_actual.descripcion }}{% else %}Ciclo contable completo{% endif %}{% endblock %}</p>
         </div>
         <div class="encabezado-acciones no-imprimir">{% block acciones_barra %}{% endblock %}</div>
       </div>
@@ -134,7 +133,7 @@
     </main>
 
     <footer class="pie no-imprimir">
-      Contabilidad UNI · Sistema contable · Django + SQLite
+      Sistema y Gestión Financiera · Django + PostgreSQL
     </footer>
 
     {% block scripts %}{% endblock %}

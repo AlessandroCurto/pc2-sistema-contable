@@ -102,7 +102,7 @@ class _Lienzo(reportlab_canvas.Canvas):
         self.setFont("Helvetica", 8)
         self.setFillColor(ATENUADO)
         texto = (
-            "Contabilidad UNI"
+            "Sistema y Gestión Financiera"
             + SEPARADOR
             + self.empresa
             + SEPARADOR
@@ -126,7 +126,7 @@ class _Documento(BaseDocTemplate):
             topMargin=MARGEN,
             bottomMargin=MARGEN,
             title="Reporte Financiero Completo",
-            author="Contabilidad UNI",
+            author="Sistema y Gestión Financiera",
         )
         self.empresa = empresa
         self.periodo = periodo
@@ -297,7 +297,7 @@ def generar_reporte_pdf(caso: Caso, secciones: Sequence[str], nombre_empresa: st
     historia = [
         Spacer(1, 18 * pt),
         Paragraph(
-            "Generado el " + formatear_fecha(date.today()) + " con Contabilidad UNI.", ESTILO_NOTA
+            "Generado el " + formatear_fecha(date.today()) + " con el Sistema y Gestión Financiera.", ESTILO_NOTA
         ),
         Spacer(1, 8 * pt),
         Paragraph(

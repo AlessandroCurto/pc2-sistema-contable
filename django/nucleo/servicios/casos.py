@@ -32,7 +32,7 @@ def exportar_json(caso: Caso) -> dict:
     asientos = list(caso.asientos.all().prefetch_related("lineas__cuenta"))
     return {
         "version": VERSION_RESPALDO,
-        "generadoPor": "Contabilidad UNI (Django)",
+        "generadoPor": "Sistema y Gestión Financiera (Django)",
         "caso": {
             "nombre": caso.nombre,
             "razonSocial": caso.razon_social,

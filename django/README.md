@@ -1,4 +1,4 @@
-# Contabilidad UNI - versión en Python con Django
+# Sistema y Gestión Financiera - versión en Python con Django
 
 La misma aplicación de la carpeta raíz (React + TypeScript), traducida a Python.
 Automatiza el ciclo contable completo: plan de cuentas, asientos, Libro Diario,
@@ -25,7 +25,7 @@ cd django
 py -3.12 -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python manage.py migrate
-.venv/Scripts/python manage.py cargar_demo        # dos casos de ejemplo (opcional)
+.venv/Scripts/python manage.py cargar_demo        # tres casos de ejemplo (opcional)
 .venv/Scripts/python manage.py runserver
 ```
 
@@ -36,8 +36,8 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 41 pruebas: motor contable, pantallas, PDF, Excel e importación |
-| `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los dos casos de clase |
+| `manage.py test nucleo` | 47 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
 ## Cómo está organizado
@@ -47,7 +47,7 @@ django/
   contabilidad/        configuración del proyecto (settings, urls, wsgi)
   nucleo/
     dominio/           el motor contable: Python puro, no importa Django
-    datos/             plantillas de plan de cuentas y los dos casos de ejemplo
+    datos/             plantillas de plan de cuentas y los casos de ejemplo
     servicios/         PDF (ReportLab), Excel (pandas) y respaldos JSON
     models.py          Caso, Cuenta, Asiento, LineaAsiento (SQLite)
     forms.py           formularios; la validación la hace el dominio
@@ -134,7 +134,7 @@ Detalles de la base:
 Otras opciones que también sirven: PythonAnywhere, Railway, Fly.io o Neon para
 la base.
 
-## Los dos casos de ejemplo
+## Los casos de ejemplo
 
 `manage.py cargar_demo` carga los casos de las clases, que sirven para comprobar
 que todo calcula igual que antes:
@@ -143,6 +143,10 @@ que todo calcula igual que antes:
 | --- | --- | --- | --- | --- |
 | CYBERTEC S.A. | 4 | 0% | 100,000.00 | 10,000.00 |
 | Comercializadora Metropolitana | 8 | 30% | 9,168,776.00 | 105,016.80 |
+| Comercializadora del Sur S.A.C. | 8 | 29.5% | 9,170,697.63 | 100,746.17 |
+
+Comercializadora del Sur usa el IGV del 18% (Perú) y junio de 2024 en todos
+los asientos: el enunciado mezcla 2023, 2024 y 2025, que son errores de tipeo.
 
 Esas mismas cifras están escritas en `nucleo/tests/test_motor.py`: si una
 fórmula se rompe, las pruebas lo dicen.

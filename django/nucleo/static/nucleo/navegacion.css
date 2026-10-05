@@ -127,7 +127,8 @@ body {
 
 .nav-marca-texto strong {
   display: block;
-  font-size: 16px;
+  max-width: 150px;
+  font-size: 14.5px;
   font-weight: 700;
   letter-spacing: 0.2px;
   line-height: 1.15;

@@ -1,4 +1,4 @@
-"""Configuración de Django para el proyecto Contabilidad UNI.
+"""Configuración de Django para el proyecto Sistema y Gestión Financiera.
 
 Todo apunta a un uso local: SQLite, DEBUG activable por variable de entorno y
 sin dependencias externas. La aplicación no tiene login: como en la versión web

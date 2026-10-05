@@ -93,7 +93,7 @@
       var empresa = '{{ caso.razon_social|default:caso.nombre|escapejs }}';
       var asunto = encodeURIComponent('Reporte financiero - ' + empresa);
       var cuerpo = encodeURIComponent(
-        'Adjunto el reporte financiero de ' + empresa + ' generado con Contabilidad UNI.\n\n' +
+        'Adjunto el reporte financiero de ' + empresa + ' generado con el Sistema y Gestión Financiera.\n\n' +
           'El archivo PDF se descarga desde el sistema. Adjuntalo a este correo antes de enviarlo.',
       );
       window.location.href = 'mailto:' + correo + '?subject=' + asunto + '&body=' + cuerpo;
