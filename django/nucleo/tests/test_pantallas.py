@@ -48,7 +48,7 @@ class PantallasTest(TestCase):
         Caso.objects.all().delete()
         respuesta = self.client.get(reverse("inicio"))
         self.assertEqual(respuesta.status_code, 200)
-        self.assertContains(respuesta, "Bienvenido a Contabilidad UNI")
+        self.assertContains(respuesta, "Bienvenido al Sistema y Gestión Financiera")
 
     def test_inicio_muestra_las_cifras_del_caso(self):
         respuesta = self.client.get(reverse("inicio"))
@@ -355,7 +355,7 @@ class CargarDemoTest(TestCase):
         from django.core.management import call_command
 
         call_command("cargar_demo", si_vacio=True, stdout=io.StringIO())
-        self.assertEqual(Caso.objects.count(), 2)
+        self.assertEqual(Caso.objects.count(), 3)
 
     def test_con_casos_guardados_no_toca_nada(self):
         from django.core.management import call_command

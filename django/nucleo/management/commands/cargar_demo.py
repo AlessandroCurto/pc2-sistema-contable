@@ -7,7 +7,7 @@ from ...models import Caso
 
 
 class Command(BaseCommand):
-    help = "Crea los casos de ejemplo (CYBERTEC y Comercializadora Metropolitana)."
+    help = "Crea los casos de ejemplo (CYBERTEC, Comercializadora Metropolitana y Comercializadora del Sur)."
 
     def add_arguments(self, parser):
         parser.add_argument(

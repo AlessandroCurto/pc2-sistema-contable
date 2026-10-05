@@ -164,7 +164,81 @@ METROPOLITANA = PlantillaCaso(
     ],
 )
 
-PLANTILLAS_CASO = [CYBERTEC, METROPOLITANA]
+COMERCIALIZADORA_SUR = PlantillaCaso(
+    id="comercializadora-sur",
+    nombre="Comercializadora del Sur S.A.C.",
+    descripcion=(
+        "Junio 2024: saldos iniciales, compra con 10 letras, venta con IGV (40% en "
+        "efectivo y 4 letras), arriendo, pagos, cobranzas y costo de ventas."
+    ),
+    plantilla_cuentas="numerado",
+    razon_social="Comercializadora del Sur S.A.C.",
+    ruc="20100000003",
+    simbolo_moneda="S/",
+    periodo_inicio=date(2024, 6, 1),
+    periodo_fin=date(2024, 6, 30),
+    tasa_impuesto_renta=Decimal("29.5"),
+    impuesto_afecta_patrimonio=False,
+    asientos=[
+        AsientoDemo(
+            fecha=date(2024, 6, 1),
+            glosa="Inventario inicial: efectivo, cuenta corriente, clientes, proveedores y capital",
+            lineas=[
+                _debe("101", 2500000),
+                _debe("102", 3500000),
+                _debe("103", 600000),
+                _haber("201", 800000),
+                _haber("301", 5800000),
+            ],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 6, 1),
+            glosa="Compra de mercaderías a Adelco Ltda. por 1,000,000 (IGV incluido) con 10 letras",
+            lineas=[
+                _debe("105", "847457.63"),
+                _debe("106", "152542.37"),
+                _haber("202", 1000000),
+            ],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 6, 2),
+            glosa="Venta a Mario Cea Castro por 400,000 más IGV: 40% en efectivo y 4 letras (101 a 104)",
+            lineas=[
+                _debe("101", 188800),
+                _debe("104", 283200),
+                _haber("401", 400000),
+                _haber("203", 72000),
+            ],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 6, 10),
+            glosa="Pago del arriendo mensual de la oficina con cheque",
+            lineas=[_debe("501", 100000), _haber("102", 100000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 6, 11),
+            glosa="Pago con cheque del 50% de la deuda inicial con proveedores",
+            lineas=[_debe("201", 400000), _haber("102", 400000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 6, 15),
+            glosa="Cobro con cheque de las letras 101 y 102 de Mario Cea Castro",
+            lineas=[_debe("101", 141600), _haber("104", 141600)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 6, 30),
+            glosa="Pago con cheque de 3 letras a Adelco Ltda.",
+            lineas=[_debe("202", 300000), _haber("102", 300000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 6, 30),
+            glosa="Costo de ventas por diferencia de inventarios: existencia final 690,360",
+            lineas=[_debe("502", "157097.63"), _haber("105", "157097.63")],
+        ),
+    ],
+)
+
+PLANTILLAS_CASO = [CYBERTEC, METROPOLITANA, COMERCIALIZADORA_SUR]
 
 OPCIONES_CASO_DEMO = [(plantilla.id, plantilla.nombre) for plantilla in PLANTILLAS_CASO]
 

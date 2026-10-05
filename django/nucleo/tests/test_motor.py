@@ -1,4 +1,4 @@
-"""Pruebas del motor contable con los dos casos de clase.
+"""Pruebas del motor contable con los casos de clase.
 
 Las cifras son las mismas que da la versión en React: si una fórmula se tradujo
 mal, estas pruebas lo muestran.
@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from ..datos.casos_demo import CYBERTEC, METROPOLITANA, crear_caso_demo
+from ..datos.casos_demo import COMERCIALIZADORA_SUR, CYBERTEC, METROPOLITANA, crear_caso_demo
 from ..dominio.balance_comprobacion import construir_balance_comprobacion
 from ..dominio.balance_general import construir_balance_general
 from ..dominio.estado_resultados import construir_estado_resultados
@@ -123,3 +123,35 @@ class MetropolitanaTest(TestCase):
         general = construir_balance_general(caso)
         self.assertTrue(general.resultado_neto_de_impuesto)
         self.assertEqual(general.resultado_ejercicio, estado.utilidad_neta)
+
+
+class ComercializadoraSurTest(TestCase):
+    """Comercializadora del Sur S.A.C.: IGV del 18% e impuesto a la renta del 29.5%."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR).a_dominio()
+
+    def test_balance_comprobacion_cuadrado(self):
+        balance = construir_balance_comprobacion(self.caso)
+        self.assertTrue(balance.cuadrado)
+        self.assertEqual(balance.total_debe, Decimal("9170697.63"))
+
+    def test_costo_de_ventas_por_diferencia_de_inventarios(self):
+        mayor = {
+            item.cuenta.codigo: item
+            for grupo in construir_libro_mayor(self.caso).grupos
+            for item in grupo.cuentas
+        }
+        self.assertEqual(mayor["105"].saldo, Decimal("690360.00"))
+
+    def test_estado_resultados(self):
+        estado = construir_estado_resultados(self.caso)
+        self.assertEqual(estado.resultado_antes_impuesto, Decimal("142902.37"))
+        self.assertEqual(estado.impuesto, Decimal("42156.20"))
+        self.assertEqual(estado.utilidad_neta, Decimal("100746.17"))
+
+    def test_balance_general_cuadra(self):
+        general = construir_balance_general(self.caso)
+        self.assertTrue(general.cuadrado)
+        self.assertEqual(general.total_activo, Decimal("7114902.37"))
