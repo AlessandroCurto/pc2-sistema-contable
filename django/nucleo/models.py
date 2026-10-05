@@ -32,10 +32,11 @@ class Caso(models.Model):
     )
     impuesto_afecta_patrimonio = models.BooleanField(
         "el impuesto a la renta afecta al patrimonio",
-        default=False,
+        default=True,
         help_text=(
-            "Si se marca, el Balance General resta el impuesto del resultado del "
-            "ejercicio. Sin marcar, el patrimonio muestra la utilidad antes de impuestos."
+            "Marcado (lo correcto): el patrimonio muestra la utilidad neta y el impuesto "
+            "aparece como pasivo por pagar. Sin marcar, el patrimonio muestra la utilidad "
+            "antes de impuestos y no se registra la deuda con SUNAT."
         ),
     )
     creado_en = models.DateTimeField(auto_now_add=True)

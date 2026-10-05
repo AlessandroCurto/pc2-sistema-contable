@@ -2,6 +2,8 @@
 
 El resultado del ejercicio sale del Estado de Resultados y se suma al
 patrimonio, porque las cuentas de ingreso y gasto se cierran contra él.
+Si el patrimonio lleva la utilidad neta, el impuesto a la renta que se le restó
+se le debe a SUNAT: aparece como pasivo corriente para que el balance cuadre.
 """
 
 from __future__ import annotations
@@ -16,6 +18,14 @@ from .numeros import redondear, son_iguales, sumar
 from .tipos import Caso, Cuenta, Rubro, TipoCuenta
 
 CERO = Decimal("0.00")
+
+IMPUESTO_POR_PAGAR = Cuenta(
+    id="__impuesto_renta_por_pagar",
+    codigo="4017",
+    nombre="Impuesto a la renta por pagar",
+    tipo=TipoCuenta.PASIVO,
+    rubro=Rubro.CORRIENTE,
+)
 
 
 @dataclass
@@ -49,6 +59,7 @@ class BalanceGeneral:
     cuadrado: bool
     #: True cuando el resultado del ejercicio ya está neto de impuesto a la renta.
     resultado_neto_de_impuesto: bool
+    impuesto_por_pagar: Decimal = CERO
 
 
 def _bloque(clave: str, etiqueta: str, cuentas: List[DetalleCuentaBalance]) -> BloqueBalance:
@@ -85,25 +96,29 @@ def construir_balance_general(caso: Caso) -> BalanceGeneral:
             if cuenta.tipo == tipo and (rubro is None or rubro_efectivo(cuenta) == rubro)
         ]
 
+    estado = construir_estado_resultados(caso)
+    resultado_neto_de_impuesto = caso.empresa.impuesto_afecta_patrimonio is True
+    impuesto_por_pagar = estado.impuesto if resultado_neto_de_impuesto else CERO
+    resultado_ejercicio = (
+        estado.utilidad_neta if resultado_neto_de_impuesto else estado.resultado_antes_impuesto
+    )
+
     activo_corriente = _bloque(
         "activoCorriente", "Activo corriente", tomar(TipoCuenta.ACTIVO, Rubro.CORRIENTE)
     )
     activo_no_corriente = _bloque(
         "activoNoCorriente", "Activo no corriente", tomar(TipoCuenta.ACTIVO, Rubro.NO_CORRIENTE)
     )
-    pasivo_corriente = _bloque(
-        "pasivoCorriente", "Pasivo corriente", tomar(TipoCuenta.PASIVO, Rubro.CORRIENTE)
-    )
+    cuentas_pasivo_corriente = tomar(TipoCuenta.PASIVO, Rubro.CORRIENTE)
+    if impuesto_por_pagar > 0:
+        cuentas_pasivo_corriente.append(
+            DetalleCuentaBalance(cuenta=IMPUESTO_POR_PAGAR, monto=impuesto_por_pagar)
+        )
+    pasivo_corriente = _bloque("pasivoCorriente", "Pasivo corriente", cuentas_pasivo_corriente)
     pasivo_no_corriente = _bloque(
         "pasivoNoCorriente", "Pasivo no corriente", tomar(TipoCuenta.PASIVO, Rubro.NO_CORRIENTE)
     )
     patrimonio = _bloque("patrimonio", "Patrimonio", tomar(TipoCuenta.PATRIMONIO))
-
-    estado = construir_estado_resultados(caso)
-    resultado_neto_de_impuesto = caso.empresa.impuesto_afecta_patrimonio is True
-    resultado_ejercicio = (
-        estado.utilidad_neta if resultado_neto_de_impuesto else estado.resultado_antes_impuesto
-    )
 
     total_activo = redondear(activo_corriente.total + activo_no_corriente.total)
     total_pasivo = redondear(pasivo_corriente.total + pasivo_no_corriente.total)
@@ -125,4 +140,5 @@ def construir_balance_general(caso: Caso) -> BalanceGeneral:
         diferencia=redondear(total_activo - total_pasivo_patrimonio),
         cuadrado=son_iguales(total_activo, total_pasivo_patrimonio),
         resultado_neto_de_impuesto=resultado_neto_de_impuesto,
+        impuesto_por_pagar=impuesto_por_pagar,
     )

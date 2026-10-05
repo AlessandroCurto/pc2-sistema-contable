@@ -178,7 +178,7 @@ COMERCIALIZADORA_SUR = PlantillaCaso(
     periodo_inicio=date(2024, 6, 1),
     periodo_fin=date(2024, 6, 30),
     tasa_impuesto_renta=Decimal("29.5"),
-    impuesto_afecta_patrimonio=False,
+    impuesto_afecta_patrimonio=True,
     asientos=[
         AsientoDemo(
             fecha=date(2024, 6, 1),

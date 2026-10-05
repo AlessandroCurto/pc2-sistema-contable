@@ -123,6 +123,8 @@ class MetropolitanaTest(TestCase):
         general = construir_balance_general(caso)
         self.assertTrue(general.resultado_neto_de_impuesto)
         self.assertEqual(general.resultado_ejercicio, estado.utilidad_neta)
+        self.assertEqual(general.impuesto_por_pagar, Decimal("45007.20"))
+        self.assertTrue(general.cuadrado)
 
 
 class ComercializadoraSurTest(TestCase):
@@ -155,3 +157,11 @@ class ComercializadoraSurTest(TestCase):
         general = construir_balance_general(self.caso)
         self.assertTrue(general.cuadrado)
         self.assertEqual(general.total_activo, Decimal("7114902.37"))
+
+    def test_el_impuesto_queda_como_pasivo_y_el_patrimonio_lleva_la_utilidad_neta(self):
+        general = construir_balance_general(self.caso)
+        pasivos = {d.cuenta.nombre: d.monto for d in general.pasivo_corriente.cuentas}
+        self.assertEqual(pasivos["Impuesto a la renta por pagar"], Decimal("42156.20"))
+        self.assertEqual(general.total_pasivo, Decimal("1214156.20"))
+        self.assertEqual(general.resultado_ejercicio, Decimal("100746.17"))
+        self.assertEqual(general.total_patrimonio, Decimal("5900746.17"))
