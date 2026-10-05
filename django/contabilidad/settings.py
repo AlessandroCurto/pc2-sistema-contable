@@ -8,6 +8,8 @@ estática, cada navegador trabaja con sus propios casos guardados en la sesión.
 import os
 from pathlib import Path
 
+import dj_database_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Clave de desarrollo. En un servidor real se pasa por la variable de entorno.
@@ -76,11 +78,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "contabilidad.wsgi.application"
 ASGI_APPLICATION = "contabilidad.asgi.application"
 
+# Base de datos: si existe DATABASE_URL (PostgreSQL en internet), se usa esa;
+# si no, SQLite en un archivo local. En Render hay que usar PostgreSQL, porque
+# el disco del plan gratuito se borra en cada despliegue y SQLite se perderia.
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default="sqlite:///" + str(BASE_DIR / "db.sqlite3"),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 AUTH_PASSWORD_VALIDATORS = [

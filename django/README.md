@@ -109,16 +109,30 @@ y los que no se informan uno por uno, sin dejar nada a medias.
 
 El archivo `render.yaml` despliega el proyecto en [Render](https://render.com)
 con el plan gratuito: entrar con la cuenta de GitHub, **New > Blueprint**, elegir
-este repositorio y confirmar. Las variables (`DJANGO_DEBUG=0`, la clave secreta,
-los dominios permitidos) ya están en ese archivo.
+este repositorio y como ruta poner `django/render.yaml`.
 
-Un detalle del plan gratuito: el disco se borra en cada despliegue, así que la
-base SQLite queda vacía de nuevo. Para que los casos no se pierdan hace falta un
-disco persistente o una base PostgreSQL. Mientras eso no esté, conviene usar
-"Respaldo JSON" en Configuración para guardarse el caso.
+### Dónde se guardan los datos
 
-Otras opciones que también sirven: PythonAnywhere (tiene plan gratuito y
-consola web), Railway y Fly.io.
+En Render los casos van en **PostgreSQL** (en Supabase), no en SQLite: el disco
+del plan gratuito de Render se borra en cada despliegue y con SQLite se
+perderían. La conexión se pasa con la variable `DATABASE_URL`, que se escribe en
+el panel de Render (Environment) y **nunca en el repositorio**. Sin
+`DATABASE_URL`, la aplicación usa SQLite, que es lo cómodo en la computadora.
+
+Detalles de la base:
+
+- Se entra por el *pooler* de Supabase en modo sesión (puerto 5432), porque
+  Render solo tiene IPv4 y la conexión directa de Supabase es IPv6.
+- Las tablas viven en el esquema `contabilidad`, con un usuario propio
+  (`contabilidad_app`) que solo trabaja ahí. No van en `public` porque Supabase
+  publica ese esquema en su API web.
+- En cada despliegue corre `cargar_demo --si-vacio`: llena los ejemplos la
+  primera vez y después no toca lo que se haya guardado.
+- Supabase gratuito pausa el proyecto si pasan 7 días sin uso. Los datos no se
+  pierden: se reactiva con un clic en supabase.com.
+
+Otras opciones que también sirven: PythonAnywhere, Railway, Fly.io o Neon para
+la base.
 
 ## Los dos casos de ejemplo
 

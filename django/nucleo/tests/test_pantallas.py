@@ -346,3 +346,20 @@ class ImportarAsientosTest(TestCase):
         respuesta = self.client.post(reverse("asientos_importar"), {"archivo": archivo})
         self.assertRedirects(respuesta, reverse("libro_diario"))
         self.assertEqual(self.caso.asientos.count(), antes + 1)
+
+
+class CargarDemoTest(TestCase):
+    """El despliegue llama a cargar_demo --si-vacio en cada versión nueva."""
+
+    def test_base_vacia_carga_los_ejemplos(self):
+        from django.core.management import call_command
+
+        call_command("cargar_demo", si_vacio=True, stdout=io.StringIO())
+        self.assertEqual(Caso.objects.count(), 2)
+
+    def test_con_casos_guardados_no_toca_nada(self):
+        from django.core.management import call_command
+
+        crear_caso_demo(CYBERTEC)
+        call_command("cargar_demo", si_vacio=True, stdout=io.StringIO())
+        self.assertEqual(Caso.objects.count(), 1)

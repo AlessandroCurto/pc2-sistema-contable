@@ -21,8 +21,20 @@ class Command(BaseCommand):
             action="store_true",
             help="Borra los casos existentes antes de cargar.",
         )
+        parser.add_argument(
+            "--si-vacio",
+            action="store_true",
+            help=(
+                "Carga los ejemplos solo si no hay ningun caso. Lo usa el despliegue: "
+                "la primera vez llena la base y despues no toca lo que se haya guardado."
+            ),
+        )
 
     def handle(self, *args, **opciones):
+        if opciones["si_vacio"] and Caso.objects.exists():
+            self.stdout.write("Ya hay casos guardados: no se cargan los ejemplos.")
+            return
+
         if opciones["borrar"]:
             borrados = Caso.objects.count()
             Caso.objects.all().delete()

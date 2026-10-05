@@ -1,24 +1,27 @@
-# Despliegue en Render (plan gratuito). Sirve igual para Railway o Fly:
-# lo que importa es que haya un proceso vivo de Python, cosa que GitHub Pages
-# no puede dar porque solo entrega archivos.
+# Despliegue en Render. Sirve igual para Railway o Fly: lo que importa es que
+# haya un proceso vivo de Python, cosa que GitHub Pages no puede dar porque
+# solo entrega archivos.
 #
 # Pasos: entrar a render.com con la cuenta de GitHub, New > Blueprint, elegir
-# este repositorio. Render lee este archivo y levanta el servicio.
+# este repositorio y como ruta del Blueprint poner django/render.yaml.
 #
-# Ojo con el plan gratuito: el disco se borra en cada despliegue, asi que la
-# base SQLite vuelve a quedar vacia. Para que los casos no se pierdan, agregar
-# un disco persistente (plan pago) o una base PostgreSQL.
+# Los datos van en PostgreSQL (DATABASE_URL), no en SQLite: el disco del plan
+# gratuito se borra en cada despliegue y con SQLite se perderian los casos.
+# Render pide el valor de DATABASE_URL en su panel la primera vez (sync: false),
+# asi la clave de la base nunca queda escrita en el repositorio.
 services:
   - type: web
     name: contabilidad-uni
     runtime: python
     plan: free
     rootDir: django
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py cargar_demo --si-vacio
     startCommand: gunicorn contabilidad.wsgi --log-file -
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.0"
+      - key: DATABASE_URL
+        sync: false
       - key: DJANGO_DEBUG
         value: "0"
       - key: DJANGO_SECRET_KEY
