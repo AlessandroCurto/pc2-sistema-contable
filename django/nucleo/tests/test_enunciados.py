@@ -279,7 +279,11 @@ class AsistenteConEnunciadoTest(TestCase):
         self.assertEqual(balance.total_debe, Decimal("9170697.63"))
 
     def test_completa_las_cuentas_que_le_faltan_al_plan(self):
-        """CYBERTEC usa el PCGE: no tiene letras ni cuentas de IGV."""
+        """CYBERTEC usa el PCGE: no tiene letras ni cuentas de IGV.
+
+        El enunciado nombra a la misma empresa, así que se agrega a su caso y
+        hay que completarle el plan de cuentas.
+        """
         from ..models import Caso
 
         Caso.objects.all().delete()
@@ -289,10 +293,13 @@ class AsistenteConEnunciadoTest(TestCase):
         antes = caso.cuentas.count()
         respuesta = self.client.post(
             reverse("asistente_registrar"),
-            data=json.dumps({"texto": ENUNCIADO}),
+            data=json.dumps({"texto": ENUNCIADO.replace(
+                "Comercializadora del Sur S.A.C.", "CYBERTEC S.A."
+            )}),
             content_type="application/json",
         )
         datos = respuesta.json()
+        self.assertEqual(datos["caso"], "")            # no creó otro caso
         self.assertEqual(datos["guardados"], 8)
         self.assertGreater(datos["cuentas"], 0)
         self.assertGreater(caso.cuentas.count(), antes)
@@ -404,3 +411,76 @@ class ElLectorCoincideConElCasoGuardadoTest(TestCase):
             for linea in asiento.lineas
         )
         self.assertEqual(leido, esperado)
+
+
+class NoMezclarDosEmpresasTest(TestCase):
+    """Pegar el enunciado de otra empresa no debe ensuciar el caso abierto."""
+
+    OTRA = (
+        "La empresa Comercial Pacífico S.A.C. presenta el siguiente inventario inicial "
+        "al 01 de setiembre del 2024: dinero en efectivo S/ 1,200,000, cuenta corriente "
+        "S/ 2,800,000, Mercaderías S/ 600,000, Proveedores S/ 700,000 y capital "
+        "S/ 3,900,000.\n"
+        "03/09/2024 - Se compran mercaderías por S/ 1,180,000.00 (IGV incluido), "
+        "firmando 8 letras de cambio de igual valor.\n"
+        "12/09/2024 - Se paga el arriendo del almacén por S/ 120,000.00 netos con cheque."
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR)
+
+    def _registrar(self, texto):
+        return self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": texto}),
+            content_type="application/json",
+        ).json()
+
+    def test_otra_empresa_va_a_un_caso_nuevo(self):
+        from ..models import Caso
+
+        self.client.post(reverse("caso_abrir", args=[self.caso.pk]))
+        antes = self.caso.asientos.count()
+        datos = self._registrar(self.OTRA)
+
+        self.assertEqual(datos["caso"], "Comercial Pacífico S.A.C.")
+        self.assertEqual(self.caso.asientos.count(), antes)  # intacto
+        nuevo = Caso.objects.get(nombre="Comercial Pacífico S.A.C.")
+        self.assertEqual(nuevo.asientos.count(), 3)
+        self.assertEqual(Caso.objects.count(), 2)
+
+    def test_el_caso_nuevo_queda_abierto(self):
+        self.client.post(reverse("caso_abrir", args=[self.caso.pk]))
+        self._registrar(self.OTRA)
+        respuesta = self.client.get(reverse("inicio"))
+        self.assertContains(respuesta, "Comercial Pacífico S.A.C.")
+
+    def test_la_misma_empresa_si_se_agrega_al_caso_abierto(self):
+        from ..models import Caso
+
+        self.client.post(reverse("caso_abrir", args=[self.caso.pk]))
+        antes = self.caso.asientos.count()
+        datos = self._registrar(
+            "La empresa Comercializadora del Sur S.A.C. informa: "
+            "05/07/2024 - Se paga el arriendo por S/ 5,000.00 netos con cheque."
+        )
+        self.assertEqual(datos["caso"], "")           # no creó ninguno
+        self.assertEqual(Caso.objects.count(), 1)
+        self.assertEqual(self.caso.asientos.count(), antes + 1)
+
+    def test_un_enunciado_sin_empresa_sigue_en_el_caso_abierto(self):
+        from ..models import Caso
+
+        self.client.post(reverse("caso_abrir", args=[self.caso.pk]))
+        antes = self.caso.asientos.count()
+        self._registrar("05/07/2024 - Se paga el arriendo por S/ 5,000.00 netos con cheque.")
+        self.assertEqual(Caso.objects.count(), 1)
+        self.assertEqual(self.caso.asientos.count(), antes + 1)
+
+    def test_el_aviso_lo_dice_antes_de_registrar(self):
+        from ..servicios import asistente
+
+        respuesta = asistente.responder(self.OTRA, self.caso.a_dominio())
+        self.assertIn("Comercial Pacífico S.A.C.", respuesta)
+        self.assertIn("caso aparte", respuesta)

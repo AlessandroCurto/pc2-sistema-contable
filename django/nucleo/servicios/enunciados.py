@@ -930,8 +930,8 @@ CASO_VACIO = CasoDominio(id="", nombre="", empresa=Empresa(nombre=""))
 
 def resolver(texto: str, caso: Optional[CasoDominio]) -> str:
     """La respuesta del asistente ante un enunciado pegado en el chat."""
-    sin_caso = caso is None
-    base = caso or CASO_VACIO
+    sin_caso = nombra_otra_empresa(texto, caso)
+    base = CASO_VACIO if sin_caso else caso
     lectura = leer(texto, base)
     cuerpo = a_markdown(lectura, base)
     if not lectura.asientos:
@@ -940,10 +940,17 @@ def resolver(texto: str, caso: Optional[CasoDominio]) -> str:
     encabezado = []
     if sin_caso:
         datos = datos_del_caso(texto)
-        encabezado.append(
-            f"No tenías ningún caso abierto, así que preparé uno nuevo: "
-            f"**{datos['nombre']}**, con su plan de cuentas. Lo creo al registrar."
-        )
+        if caso is None:
+            encabezado.append(
+                f"No tenías ningún caso abierto, así que preparé uno nuevo: "
+                f"**{datos['nombre']}**, con su plan de cuentas. Lo creo al registrar."
+            )
+        else:
+            encabezado.append(
+                f"Este enunciado es de **{datos['nombre']}**, y tu caso abierto es "
+                f"**{caso.empresa.nombre or caso.nombre}**. Para no mezclar dos "
+                f"contabilidades, al registrar creo un caso aparte y lo dejo abierto."
+            )
     elif lectura.cuentas_nuevas:
         nombres = ", ".join(f"**{c.codigo} {c.nombre}**" for c in lectura.cuentas_nuevas)
         encabezado.append(
@@ -953,3 +960,31 @@ def resolver(texto: str, caso: Optional[CasoDominio]) -> str:
     if encabezado:
         return "\n\n".join(encabezado) + "\n\n" + cuerpo
     return cuerpo
+
+
+def _sin_forma_societaria(nombre: str) -> str:
+    plano = _plano(nombre)
+    for forma in ("s a c", "s r l", "e i r l", "s a a", "s a", "sac", "srl", "eirl", "saa", "sa"):
+        plano = plano.replace(forma, " ")
+    return " ".join(plano.split())
+
+
+def nombra_otra_empresa(texto: str, caso: Optional[CasoDominio]) -> bool:
+    """¿El enunciado es de una empresa distinta a la del caso abierto?
+
+    Importa porque registrar las operaciones de una empresa dentro del caso de
+    otra mezcla dos contabilidades y el resultado no significa nada.
+    """
+    if caso is None:
+        return True
+    hallada = EMPRESA.search(texto)
+    if not hallada:
+        return False  # sin nombre, se asume que sigue el mismo caso
+    delenunciado = _sin_forma_societaria(hallada.group(1))
+    if not delenunciado:
+        return False
+    for conocido in (caso.empresa.nombre, caso.nombre):
+        actual = _sin_forma_societaria(conocido or "")
+        if actual and (actual in delenunciado or delenunciado in actual):
+            return False
+    return True

@@ -674,10 +674,11 @@ def asistente_registrar(request):
     texto = texto[:CHAT_MAX_CARACTERES]
 
     caso = caso_activo(request)
-    creado = caso is None
+    # Las operaciones de otra empresa no van dentro del caso abierto.
+    creado = enunciados.nombra_otra_empresa(texto, caso.a_dominio() if caso else None)
     try:
         with transaction.atomic():
-            if caso is None:
+            if creado:
                 caso = Caso.objects.create(**enunciados.datos_del_caso(texto))
 
             lectura = enunciados.leer(texto, caso.a_dominio())
