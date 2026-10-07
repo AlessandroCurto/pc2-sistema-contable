@@ -1475,3 +1475,28 @@ def _responder_cuenta(expresion: str) -> str:
             "multiplicaciones y divisiones, por ejemplo `1+1` o `(400000*1.18)/2`."
         )
     return f"`{expresion}` = **{resultado:,}**".replace(",", " ")
+
+
+# ------------------------------------------------------- generar un caso
+
+_PIDE_CASO = (
+    "genera un caso", "generame un caso", "genera un enunciado", "crea un caso",
+    "creame un caso", "inventa un caso", "inventame un caso", "inventa un enunciado",
+    "dame un caso", "damelo al azar", "caso al azar", "caso aleatorio",
+    "caso de prueba", "un ejercicio", "inventa un ejercicio", "genera un ejercicio",
+    "dame un ejercicio", "crea un ejercicio", "caso random", "generar caso",
+    "un caso nuevo al azar", "proponme un caso",
+)
+
+
+def pide_caso_nuevo(pregunta: str) -> bool:
+    """¿Está pidiendo que se invente un caso?"""
+    limpia = normalizar(pregunta).strip()
+    if any(frase in limpia for frase in _PIDE_CASO):
+        return True
+    # "genera / inventa / crea ... un caso" con palabras en medio.
+    return bool(
+        re.search(r"\b(genera|generame|crea|creame|inventa|inventame|proponme|dame)\b", limpia)
+        and re.search(r"\b(caso|enunciado|ejercicio)\b", limpia)
+        and re.search(r"\b(azar|aleatorio|random|nuevo|prueba|practicar|practica)\b", limpia)
+    )

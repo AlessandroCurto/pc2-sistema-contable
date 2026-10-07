@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 193 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 200 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -101,19 +101,23 @@ servidor (`servicios/asistente.py`). Hace tres cosas:
    cuentas las agrega con su tipo y rubro correctos, y si no hay ningún caso abierto lo crea
    con el nombre y el período que saca del propio enunciado. La operación que no reconoce la informa en vez de inventarla, y
    nunca propone un asiento descuadrado.
-2. **Saca conclusiones.** «Dime las conclusiones» no repite las cifras: calcula los
+2. **Inventa un caso.** «Genérame un caso» arma un enunciado nuevo con ocho operaciones
+   encadenadas (`servicios/generador.py`). No escribe los asientos: escribe el enunciado y
+   lo pasa por el mismo lector, y solo lo entrega si de ahí salen ocho asientos cuadrados
+   con utilidad positiva; si no, prueba con otro. Así lo que da siempre se puede resolver.
+3. **Saca conclusiones.** «Dime las conclusiones» no repite las cifras: calcula los
    márgenes, la razón corriente y el endeudamiento, y dice qué significan —si ganó o
    perdió, si la liquidez alcanza, si el IGV queda a favor o por pagar.
-3. **Revisa el caso abierto con sus cifras reales.** «¿Cómo está mi caso?» devuelve el
+4. **Revisa el caso abierto con sus cifras reales.** «¿Cómo está mi caso?» devuelve el
    resumen con sus importes; «¿por qué no cuadra?» recorre los asientos y nombra el que
    falla, con su diferencia. Aquí el asistente le gana a un modelo de lenguaje: no estima,
    lee el caso y usa el mismo motor contable que las pantallas.
-4. **Cambia de caso.** «Abre el caso CYBERTEC» lo busca por nombre (aunque venga a
+5. **Cambia de caso.** «Abre el caso CYBERTEC» lo busca por nombre (aunque venga a
    medias), lo abre y recarga la pantalla. Si no existe, lo dice y lista los que hay.
-5. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
+6. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
    descargas, configuración y los cinco reportes.
-6. **Responde por sí mismo**: «¿cuál es la tasa que usas?» o «¿cómo funciona la página?».
-7. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
+7. **Responde por sí mismo**: «¿cuál es la tasa que usas?» o «¿cómo funciona la página?».
+8. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
    renta, costo de ventas, letras y el ciclo contable. También hace la cuenta si le pasas
    un monto («cuánto es el IGV de 1,000,000 incluido»).
 

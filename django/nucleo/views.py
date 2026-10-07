@@ -45,6 +45,7 @@ from .models import Asiento, Caso, Cuenta, UsoAsistente
 from .navegacion import accesos_rapidos
 from .servicios import asistente
 from .servicios import enunciados
+from .servicios import generador
 from .servicios import chatbot as chatbot_servicio
 from .servicios import excel as servicio_excel
 from .servicios.casos import (
@@ -646,6 +647,28 @@ def chatbot(request):
         )
 
     pregunta = mensajes[-1]["content"]
+
+    # "genérame un caso": se inventa uno y se ofrece registrarlo.
+    if asistente.pide_caso_nuevo(pregunta):
+        generado = generador.generar()
+        if generado is None:
+            return _respuesta_en_vivo([
+                _evento(t="No logré armar un caso coherente ahora. Inténtalo de nuevo."),
+                _evento(fin=True),
+            ])
+        lectura = enunciados.leer(generado.enunciado, enunciados.CASO_VACIO)
+        texto = (
+            f"Te armé un caso nuevo: **{generado.empresa}**, con {generado.asientos} "
+            f"operaciones.\n\nLo comprobé antes de dártelo: los asientos cuadran, el "
+            f"balance de comprobación cierra en **S/ {generado.total_debe:,.2f}** y el "
+            f"período deja una utilidad neta de **S/ {generado.utilidad_neta:,.2f}**.\n\n"
+            "### Enunciado\n\n```\n" + generado.enunciado + "\n```\n\n"
+            + enunciados.a_markdown(lectura, enunciados.CASO_VACIO)
+        )
+        return _respuesta_en_vivo([
+            _evento(t=texto),
+            _evento(accion="registrar", texto=generado.enunciado),
+        ])
 
     # "abre el caso X": se cambia de caso y se le pide a la pantalla recargar.
     pedido = asistente.caso_pedido(pregunta)

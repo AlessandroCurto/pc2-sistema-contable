@@ -887,7 +887,11 @@ def parece_enunciado(texto: str) -> bool:
 
 EMPRESA = re.compile(
     r"(?:la\s+empresa\s+|empresa\s*:\s*)([A-ZÁÉÍÓÚÑ][^.,;:\n]{2,70}?"
-    r"(?:S\.?A\.?C?\.?|E\.?I\.?R\.?L\.?|S\.?R\.?L\.?))",
+    # La forma societaria tiene que ser una palabra entera. Sin los \b de los
+    # dos lados, el "Sa" de "Santa" y el "sa" de "Rosa" la daban por buena y el
+    # nombre salía cortado a la mitad.
+    r"\b(?:S\.A\.C\.?|E\.I\.R\.L\.?|S\.R\.L\.?|S\.A\.A\.?|S\.A\.|"
+    r"SAC\b|EIRL\b|SRL\b|SAA\b|SA\b))",
     re.IGNORECASE,
 )
 

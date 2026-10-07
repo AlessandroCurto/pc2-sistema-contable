@@ -645,3 +645,87 @@ class LaRedaccionNuevaDelEnunciadoTest(TestCase):
         lectura = enunciados.leer(self.REDACTADO, self.caso.a_dominio())
         cobro = next(a for a in lectura.asientos if "Cobro" in a.glosa)
         self.assertEqual([l.cuenta.codigo for l in cobro.lineas if l.debe], ["102"])
+
+
+class GenerarUnCasoTest(TestCase):
+    """«Genérame un caso» tiene que entregar uno resoluble, no un texto bonito."""
+
+    def test_el_generador_siempre_entrega_uno_valido(self):
+        from ..servicios import generador
+
+        for semilla in range(25):
+            with self.subTest(semilla=semilla):
+                caso = generador.generar(semilla=semilla)
+                self.assertIsNotNone(caso, "no logró generar con esa semilla")
+                self.assertEqual(caso.asientos, 8)
+                self.assertGreater(caso.utilidad_neta, 0)
+
+    def test_lo_que_genera_lo_sabe_leer(self):
+        """Se genera con el mismo lector con el que se resuelve: no pueden diferir."""
+        from ..servicios import generador
+
+        for semilla in (0, 5, 11, 19):
+            with self.subTest(semilla=semilla):
+                caso = generador.generar(semilla=semilla)
+                lectura = enunciados.leer(caso.enunciado, enunciados.CASO_VACIO)
+                self.assertEqual(lectura.problemas, [])
+                self.assertEqual(len(lectura.asientos), 8)
+                for asiento in lectura.asientos:
+                    self.assertTrue(asiento.cuadra, asiento.glosa)
+
+    def test_cada_caso_es_distinto(self):
+        from ..servicios import generador
+
+        empresas = {generador.generar(semilla=s).empresa for s in range(12)}
+        self.assertGreater(len(empresas), 6)
+
+    def test_el_nombre_de_la_empresa_sale_entero(self):
+        """«Inversiones Santa Rosa S.A.C.» se cortaba en «Inversiones Sa»."""
+        datos = enunciados.datos_del_caso(
+            "La empresa Inversiones Santa Rosa S.A.C. presenta el siguiente inventario "
+            "inicial: efectivo S/ 100, Clientes S/ 100 y capital S/ 200."
+        )
+        self.assertEqual(datos["nombre"], "Inversiones Santa Rosa S.A.C.")
+
+    def test_el_chat_lo_genera_y_ofrece_registrarlo(self):
+        from ..servicios import asistente
+
+        for pregunta in ("genérame un caso", "inventa un enunciado", "dame un caso al azar",
+                         "crea un ejercicio nuevo", "caso aleatorio"):
+            with self.subTest(pregunta=pregunta):
+                self.assertTrue(asistente.pide_caso_nuevo(pregunta))
+
+        respuesta = self.client.post(
+            reverse("chatbot"),
+            data=json.dumps({"mensajes": [{"role": "user", "content": "genérame un caso"}]}),
+            content_type="application/json",
+        )
+        cuerpo = b"".join(respuesta.streaming_content).decode("utf-8")
+        self.assertIn("Te arm\u00e9 un caso nuevo", cuerpo)
+        self.assertIn('"accion": "registrar"', cuerpo)
+
+    def test_no_confunde_otras_peticiones(self):
+        from ..servicios import asistente
+
+        for pregunta in ("como creo un caso", "abre el caso CYBERTEC", "como esta mi caso",
+                         "conclusiones del caso", "cuantos casos tengo"):
+            with self.subTest(pregunta=pregunta):
+                self.assertFalse(asistente.pide_caso_nuevo(pregunta))
+
+    def test_el_caso_generado_se_puede_registrar(self):
+        from ..models import Caso
+        from ..servicios import generador
+
+        Caso.objects.all().delete()
+        generado = generador.generar(semilla=4)
+        respuesta = self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": generado.enunciado}),
+            content_type="application/json",
+        )
+        datos = respuesta.json()
+        self.assertEqual(datos["guardados"], 8)
+        self.assertEqual(datos["errores"], [])
+        balance = construir_balance_comprobacion(Caso.objects.get().a_dominio())
+        self.assertTrue(balance.cuadrado)
+        self.assertEqual(balance.total_debe, generado.total_debe)
