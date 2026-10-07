@@ -412,3 +412,65 @@ class TopeDiarioGlobalTest(TestCase):
                 self._leer(self._preguntar_raro())
                 api.assert_called_once()
         self.assertEqual(UsoAsistente.objects.get(fecha=timezone.localdate()).consultas, 1)
+
+
+class PreguntasPorUnaCifraTest(TestCase):
+    """«¿Cuál es mi utilidad neta?» pide un número del caso, no una ficha.
+
+    Antes contestaba la ficha de teoría del impuesto a la renta, cuyas cifras
+    de muestra se leían como si fueran las del estudiante.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR)
+        cls.dominio = cls.caso.a_dominio()
+
+    def _responder(self, pregunta):
+        return asistente.responder(pregunta, self.dominio)
+
+    def test_da_la_utilidad_neta_del_caso(self):
+        respuesta = self._responder("¿Cuál es mi utilidad neta?")
+        self.assertIn("100,746.17", respuesta)
+        self.assertIn("Comercializadora del Sur", respuesta)
+        self.assertNotIn("105,766.92", respuesta)   # el número de la ficha
+
+    def test_cada_cifra_devuelve_la_suya(self):
+        esperados = {
+            "cuanto es mi impuesto a la renta": "42,156.20",
+            "cual es mi costo de ventas": "157,097.63",
+            "cuanto vendi": "400,000.00",
+            "cual es mi utilidad bruta": "242,902.37",
+            "cuanto es mi activo total": "7,114,902.37",
+            "cuanto es mi pasivo": "1,214,156.20",
+            "cuanto es mi patrimonio": "5,900,746.17",
+            "cuanto es el total del debe": "9,170,697.63",
+            "cuanto gane este mes": "100,746.17",
+        }
+        for pregunta, esperado in esperados.items():
+            with self.subTest(pregunta=pregunta):
+                self.assertIn(esperado, self._responder(pregunta))
+
+    def test_el_costo_de_ventas_no_se_confunde_con_las_ventas(self):
+        """«costo de ventas» contiene «ventas»: gana la cifra más específica."""
+        respuesta = self._responder("cual es mi costo de ventas")
+        self.assertIn("**Costo de ventas**", respuesta)
+
+    def test_preguntar_la_teoria_sigue_dando_la_ficha(self):
+        for pregunta in ("como se calcula el impuesto a la renta",
+                         "que es la utilidad neta",
+                         "como se calcula el costo de ventas"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIsNone(asistente.cifra_pedida(pregunta))
+
+    def test_la_ficha_avisa_que_sus_numeros_son_de_muestra(self):
+        ficha = next(f for f in asistente.FICHAS if f.clave == "impuesto-renta")
+        self.assertIn("no son las tuyas", ficha.texto)
+
+    def test_sin_caso_pide_abrir_uno(self):
+        self.assertIn("ningún caso abierto", asistente.responder("mi utilidad neta", None))
+
+    def test_sin_caso_una_pregunta_de_teoria_sigue_llegando_a_su_ficha(self):
+        """«impuesto a la renta» a secas es teoría, no una consulta del caso."""
+        respuesta = asistente.responder("impuesto a la renta", None)
+        self.assertIn("tercera categoría", respuesta)

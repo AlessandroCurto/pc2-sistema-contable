@@ -246,6 +246,108 @@ def _mi_igv(caso: Optional[CasoDominio]) -> str:
     return "\n".join(partes)
 
 
+#: "¿cuál es mi utilidad neta?" nombra una cifra: hay que dar la suya, no la
+#: de un ejemplo. Van de la más específica a la más general, porque "costo de
+#: ventas" contiene "ventas" y si no, ganaría la equivocada.
+CIFRAS: List[tuple] = [
+    ("Costo de ventas", "resultado", ("costo de ventas", "costo de la mercaderia", "costo"),
+     lambda e, g, b: e.costo_ventas),
+    ("Utilidad antes del impuesto", "resultado",
+     ("antes de impuesto", "antes del impuesto", "resultado antes"),
+     lambda e, g, b: e.resultado_antes_impuesto),
+    ("Utilidad bruta", "resultado", ("utilidad bruta", "ganancia bruta"),
+     lambda e, g, b: e.utilidad_bruta),
+    ("Utilidad neta", "resultado",
+     ("utilidad neta", "ganancia neta", "resultado neto", "cuanto gane", "cuanto gano",
+      "cuanto ganamos", "cuanto gane"),
+     lambda e, g, b: e.utilidad_neta),
+    ("Impuesto a la renta", "resultado", ("impuesto",), lambda e, g, b: e.impuesto),
+    ("Ventas netas", "resultado",
+     ("ventas", "ingresos", "cuanto vendi", "cuanto vendimos", "cuanto vendio"),
+     lambda e, g, b: e.ventas_netas),
+    ("Total del activo", "balance", ("activo",), lambda e, g, b: g.total_activo),
+    ("Total del pasivo", "balance", ("pasivo",), lambda e, g, b: g.total_pasivo),
+    ("Total del patrimonio", "balance", ("patrimonio",), lambda e, g, b: g.total_patrimonio),
+    ("Suma del Debe", "balance", ("total del debe", "suma del debe", "total movido"),
+     lambda e, g, b: b.total_debe),
+    ("Utilidad neta", "resultado", ("utilidad", "ganancia"), lambda e, g, b: e.utilidad_neta),
+]
+
+#: Si la pregunta empieza así, quiere la explicación y no el número.
+QUIERE_TEORIA = ("que es", "como se calcula", "como calculo", "como se saca",
+                 "que significa", "para que sirve", "definicion", "concepto de",
+                 "explicame", "explica")
+
+
+def cifra_pedida(pregunta: str) -> Optional[int]:
+    """La posición en CIFRAS de lo que está preguntando, si pide una cifra."""
+    limpia = normalizar(pregunta).strip()
+    if any(limpia.startswith(inicio) for inicio in QUIERE_TEORIA):
+        return None
+    for indice, (_, _, palabras, _) in enumerate(CIFRAS):
+        if any(palabra in limpia for palabra in palabras):
+            return indice
+    return None
+
+
+def _responder_cifra(indice: int, caso: Optional[CasoDominio]) -> str:
+    if caso is None:
+        return SIN_CASO
+    etiqueta, grupo, _, obtener = CIFRAS[indice]
+    simbolo = caso.empresa.simbolo_moneda
+    estado = construir_estado_resultados(caso)
+    general = construir_balance_general(caso)
+    balance = construir_balance_comprobacion(caso)
+
+    partes = [
+        f"**{etiqueta}** de {caso.empresa.nombre}: "
+        f"**{simbolo} {_n(obtener(estado, general, balance))}**",
+        "",
+    ]
+
+    if grupo == "resultado":
+        partes += [
+            "De dónde sale:",
+            "",
+            f"| Concepto | {simbolo} |",
+            "| --- | ---: |",
+            f"| Ventas netas | {_n(estado.ventas_netas)} |",
+            f"| (-) Costo de ventas | {_n(estado.costo_ventas)} |",
+            f"| **Utilidad bruta** | **{_n(estado.utilidad_bruta)}** |",
+        ]
+        if estado.gasto_administracion:
+            partes.append(f"| (-) Gastos de administración | {_n(estado.gasto_administracion)} |")
+        if estado.gasto_ventas:
+            partes.append(f"| (-) Gastos de ventas | {_n(estado.gasto_ventas)} |")
+        partes += [
+            f"| **Resultado antes del impuesto** | **{_n(estado.resultado_antes_impuesto)}** |",
+            f"| (-) Impuesto a la renta ({estado.tasa_impuesto}%) | {_n(estado.impuesto)} |",
+            f"| **Utilidad neta** | **{_n(estado.utilidad_neta)}** |",
+            "",
+            "Está en **Reportes → Estado de Resultados**.",
+        ]
+    else:
+        partes += [
+            "El Balance General de tu caso:",
+            "",
+            f"| Concepto | {simbolo} |",
+            "| --- | ---: |",
+            f"| Total activo | {_n(general.total_activo)} |",
+            f"| Total pasivo | {_n(general.total_pasivo)} |",
+            f"| Total patrimonio | {_n(general.total_patrimonio)} |",
+            f"| **Pasivo + Patrimonio** | **{_n(general.total_pasivo_patrimonio)}** |",
+            "",
+            "Está en **Reportes → Balance General**."
+            + ("" if general.cuadrado else " **Ojo: no cuadra.**"),
+        ]
+
+    partes.append(
+        "\nSi lo que querías era la explicación y no el número, pregúntame "
+        "*cómo se calcula* eso mismo."
+    )
+    return "\n".join(partes)
+
+
 def _mis_asientos(caso: Optional[CasoDominio]) -> str:
     if caso is None:
         return SIN_CASO
@@ -612,11 +714,15 @@ Al cierre del mes se netean: si el débito supera al crédito, la diferencia se 
 La tasa de **tercera categoría en Perú es 29.5%** y se aplica sobre el resultado antes de
 impuesto, **solo si es positivo**. Si la empresa perdió, no hay impuesto.
 
+Por ejemplo, con una utilidad de 150,024.00 (cifras de muestra, **no son las tuyas**):
+
 ```
 Resultado antes de impuesto  150,024.00
 (-) Impuesto 29.5%           (44,257.08)
 Utilidad neta                105,766.92
 ```
+
+*Para tus propias cifras, pregúntame «¿cuál es mi utilidad neta?».*
 
 ### Dónde va en el Balance General
 
@@ -777,6 +883,16 @@ def responder(pregunta: str, caso: Optional[CasoDominio] = None) -> str:
     # Un enunciado pegado se resuelve, no se busca en las fichas.
     if enunciados.parece_enunciado(pregunta):
         return enunciados.resolver(pregunta, caso)
+
+    # "¿cuál es mi utilidad neta?" pide un número suyo, no una ficha de teoría.
+    indice = cifra_pedida(pregunta)
+    if indice is not None:
+        if caso is not None:
+            return _responder_cifra(indice, caso)
+        # Sin caso, solo se interrumpe si preguntó por lo suyo; "impuesto a la
+        # renta" a secas es una pregunta de teoría y debe llegar a su ficha.
+        if re.search(r"\b(mi|mis|tengo|gane|gano|ganamos|vendi|vendimos)\b", limpia):
+            return SIN_CASO
 
     puntuadas = sorted(
         ((_puntaje(f, limpia), f) for f in FICHAS), key=lambda par: par[0], reverse=True
