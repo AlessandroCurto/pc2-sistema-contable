@@ -539,6 +539,11 @@
 .chat-boton-avatar {
   grid-area: 1 / 1;
   display: block;
+  /* El render trae su propio fondo: se recorta en círculo y llena el botón. */
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
   transition:
     opacity var(--chat-entrar) var(--curva-entrar),
     transform var(--chat-entrar) var(--curva-entrar);
@@ -553,8 +558,15 @@
   transform: scale(1.06);
 }
 
+.chat-insignia {
+  overflow: hidden;
+}
+
 .chat-insignia img {
   display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 @media (prefers-reduced-motion: reduce) {

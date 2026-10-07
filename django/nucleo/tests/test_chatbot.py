@@ -536,7 +536,7 @@ class AbrirOtroCasoTest(TestCase):
 class MuluniTest(TestCase):
     def test_la_pagina_entrega_el_avatar(self):
         respuesta = self.client.get(reverse("casos"))
-        self.assertContains(respuesta, "muluni.svg")
+        self.assertContains(respuesta, "muluni.png")
         self.assertContains(respuesta, "data-avatar")
 
     def test_el_chat_se_llama_muluni(self):

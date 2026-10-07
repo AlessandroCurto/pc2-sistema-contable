@@ -85,8 +85,9 @@ los cuadros en Excel.
 ## El asistente: MULUNI
 
 Abajo a la derecha hay un botón con un burrito que abre una conversación.
-El dibujo es `static/nucleo/muluni.svg`, hecho a mano: si algún día se quiere un
-render 3D de verdad, se reemplaza ese archivo y nada más.
+El avatar es `static/nucleo/muluni.png`, un render recortado a la cabeza y reducido
+a 256 px. Para cambiarlo basta con reemplazar ese archivo: la pantalla lo recorta en
+círculo con `object-fit: cover`, así que cualquier imagen cuadrada sirve.
 **Funciona sin conexión a ninguna API y sin costo**: las respuestas se arman en el
 servidor (`servicios/asistente.py`). Hace tres cosas:
 

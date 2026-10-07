@@ -405,7 +405,7 @@
     raiz.innerHTML =
       '<button class="chat-boton" type="button" aria-expanded="false" aria-controls="chat-panel"' +
       ' aria-label="Abrir a MULUNI, el asistente contable">' +
-        '<img class="chat-boton-avatar" alt="" width="40" height="40" src="' + avatar + '">' +
+        '<img class="chat-boton-avatar" alt="" width="58" height="58" src="' + avatar + '">' +
         '<svg class="chat-boton-cerrar" width="22" height="22" viewBox="0 0 24 24" fill="none"' +
         ' stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">' +
           '<path d="M6 6l12 12M18 6L6 18"/>' +
@@ -415,7 +415,7 @@
       '<section class="chat-panel" id="chat-panel" role="dialog" aria-label="MULUNI, asistente contable" inert>' +
         '<header class="chat-cabecera">' +
           '<span class="chat-insignia" aria-hidden="true">' +
-            '<img alt="" width="26" height="26" src="' + avatar + '">' +
+            '<img alt="" width="34" height="34" src="' + avatar + '">' +
           '</span>' +
           '<span class="chat-cabecera-texto">' +
             '<strong>MULUNI</strong>' +
