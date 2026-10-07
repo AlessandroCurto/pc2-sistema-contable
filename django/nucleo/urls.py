@@ -27,4 +27,5 @@ urlpatterns = [
     path("reporte/", views.reporte, name="reporte"),
     path("reporte/excel/", views.reporte_excel, name="reporte_excel"),
     path("configuracion/", views.configuracion, name="configuracion"),
+    path("chatbot/", views.chatbot, name="chatbot"),
 ]

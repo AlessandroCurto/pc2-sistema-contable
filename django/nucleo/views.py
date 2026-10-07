@@ -524,3 +524,26 @@ def configuracion(request):
         "nucleo/configuracion.html",
         {"caso": caso, "formulario": formulario, "etiquetas_tipo": ETIQUETA_TIPO},
     )
+
+
+# ----------------------------------------------------------- chatbot
+
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+@require_POST
+def chatbot(request):
+    """Endpoint AJAX para el chatbot de asistencia."""
+    try:
+        datos = json.loads(request.body)
+        mensajes = datos.get("mensajes", [])
+        if not mensajes or not isinstance(mensajes, list):
+            return JsonResponse({"error": "mensajes requerido"}, status=400)
+        # Limitar historial a últimas 20 interacciones para no exceder tokens
+        mensajes = mensajes[-20:]
+    except (json.JSONDecodeError, KeyError):
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    from .servicios.chatbot import chatear
+    respuesta = chatear(mensajes)
+    return JsonResponse({"respuesta": respuesta})
