@@ -484,3 +484,78 @@ class NoMezclarDosEmpresasTest(TestCase):
         respuesta = asistente.responder(self.OTRA, self.caso.a_dominio())
         self.assertIn("Comercial Pacífico S.A.C.", respuesta)
         self.assertIn("caso aparte", respuesta)
+
+
+class ElCasoCreadoNaceCompletoTest(TestCase):
+    """Un caso creado desde el chat tiene que quedar listo para usarse.
+
+    Sin tasa de impuesto, la utilidad neta salía igual a la utilidad antes de
+    impuesto y el estudiante veía una cifra que no era la suya.
+    """
+
+    PACIFICO = (
+        "La empresa Comercial Pacífico S.A.C. presenta el siguiente inventario inicial "
+        "al 01 de setiembre del 2024: dinero en efectivo S/ 1,200,000, cuenta corriente "
+        "S/ 2,800,000, Mercaderías S/ 600,000, Clientes S/ 400,000, Proveedores "
+        "S/ 700,000 y capital S/ 4,300,000.\n"
+        "03/09/2024 - Compra de Mercadería: Se compran mercaderías por un total de "
+        "S/ 1,180,000.00 (IGV incluido), firmando 8 letras de cambio de igual valor.\n"
+        "06/09/2024 - Venta de Mercadería: Se venden mercaderías por un valor neto de "
+        "S/ 700,000.00 (más IGV). El cliente cancela el 50% del monto total facturado en "
+        "efectivo y por el saldo acepta 4 letras de cambio (N.º 301, 302, 303 y 304).\n"
+        "12/09/2024 - Gasto Operativo: Se paga el arriendo mensual del almacén por "
+        "S/ 120,000.00 netos. La operación se cancela con cheque.\n"
+        "18/09/2024 - Amortización de Deuda: Se cancela el 50% de la deuda histórica "
+        "(inventario inicial) que se mantenía con los proveedores, emitiendo un cheque.\n"
+        "30/09/2024 - Ajuste por Costo de Ventas: Al cierre del mes, el conteo físico "
+        "determina una existencia final de mercaderías valorizada en S/ 1,160,000.00."
+    )
+
+    def _registrar(self, texto):
+        from ..models import Caso
+
+        Caso.objects.all().delete()
+        respuesta = self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": texto}),
+            content_type="application/json",
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        return Caso.objects.get()
+
+    def test_nace_con_la_tasa_de_tercera_categoria(self):
+        caso = self._registrar(self.PACIFICO)
+        self.assertEqual(caso.tasa_impuesto_renta, Decimal("29.50"))
+        self.assertTrue(caso.impuesto_afecta_patrimonio)
+
+    def test_la_utilidad_neta_no_es_la_de_antes_de_impuesto(self):
+        from ..dominio.estado_resultados import construir_estado_resultados
+
+        caso = self._registrar(self.PACIFICO)
+        estado = construir_estado_resultados(caso.a_dominio())
+        self.assertEqual(estado.resultado_antes_impuesto, Decimal("140000.00"))
+        self.assertEqual(estado.impuesto, Decimal("41300.00"))
+        self.assertEqual(estado.utilidad_neta, Decimal("98700.00"))
+        self.assertNotEqual(estado.utilidad_neta, estado.resultado_antes_impuesto)
+
+    def test_el_asistente_responde_esa_utilidad(self):
+        from ..servicios import asistente
+
+        caso = self._registrar(self.PACIFICO)
+        respuesta = asistente.responder("¿cuál es mi utilidad neta?", caso.a_dominio())
+        self.assertIn("98,700.00", respuesta)
+        self.assertIn("(29.50%)", respuesta)
+
+    def test_el_impuesto_queda_en_el_pasivo(self):
+        from ..dominio.balance_general import construir_balance_general
+
+        caso = self._registrar(self.PACIFICO)
+        general = construir_balance_general(caso.a_dominio())
+        self.assertEqual(general.impuesto_por_pagar, Decimal("41300.00"))
+        self.assertTrue(general.cuadrado)
+
+    def test_si_el_enunciado_da_otra_tasa_se_usa_esa(self):
+        caso = self._registrar(
+            self.PACIFICO + "\nLa empresa aplica un impuesto a la renta del 30%."
+        )
+        self.assertEqual(caso.tasa_impuesto_renta, Decimal("30.00"))

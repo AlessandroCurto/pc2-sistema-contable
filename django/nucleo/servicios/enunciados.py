@@ -892,6 +892,27 @@ EMPRESA = re.compile(
 )
 
 
+#: Tercera categoría en Perú. Es lo que corresponde salvo que el enunciado
+#: diga otra cosa; dejarlo en 0 haría que la utilidad neta saliera sin impuesto.
+TASA_RENTA = Decimal("29.5")
+
+#: "impuesto a la renta del 30%" / "tasa de renta: 28%".
+TASA_EN_EL_TEXTO = re.compile(
+    r"(?:impuesto\s+a\s+la\s+renta|tasa\s+(?:de|del)\s+renta|renta)[^.%\n]{0,24}?"
+    r"(\d{1,2}(?:[.,]\d+)?)\s*%"
+)
+
+
+def _tasa_del_impuesto(texto: str) -> Decimal:
+    hallada = TASA_EN_EL_TEXTO.search(_plano(texto))
+    if hallada:
+        try:
+            return Decimal(hallada.group(1).replace(",", "."))
+        except Exception:
+            pass
+    return TASA_RENTA
+
+
 def datos_del_caso(texto: str) -> dict:
     """Saca del enunciado lo necesario para crear el caso: nombre y período."""
     nombre = "Caso del enunciado"
@@ -920,7 +941,15 @@ def datos_del_caso(texto: str) -> dict:
         inicio, fin = min(delmes), max(delmes)
     else:
         inicio = fin = None
-    return {"nombre": nombre, "razon_social": nombre, "periodo_inicio": inicio, "periodo_fin": fin}
+    return {
+        "nombre": nombre,
+        "razon_social": nombre,
+        "periodo_inicio": inicio,
+        "periodo_fin": fin,
+        "tasa_impuesto_renta": _tasa_del_impuesto(texto),
+        # El impuesto es deuda con SUNAT: al pasivo, y la utilidad neta al patrimonio.
+        "impuesto_afecta_patrimonio": True,
+    }
 
 
 #: Un caso sin nada, para leer un enunciado cuando el usuario no tiene ninguno
