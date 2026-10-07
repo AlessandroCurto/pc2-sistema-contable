@@ -44,6 +44,7 @@ from .forms import (
 from .models import Asiento, Caso, Cuenta, UsoAsistente
 from .navegacion import accesos_rapidos
 from .servicios import asistente
+from .servicios import enunciados
 from .servicios import chatbot as chatbot_servicio
 from .servicios import excel as servicio_excel
 from .servicios.casos import (
@@ -628,12 +629,16 @@ def chatbot(request):
         and _queda_cupo_del_dia()
     )
 
+    ofrecer_registro = asistente.hay_enunciado(pregunta, dominio)
+
     def flujo():
         try:
             for pedazo in chatbot_servicio.responder_en_vivo(
                 mensajes, dominio, permitir_api=permitir_api
             ):
                 yield _evento(t=pedazo)
+            if ofrecer_registro:
+                yield _evento(accion="registrar", texto=pregunta)
         except chatbot_servicio.ChatbotNoConfigurado as error:
             yield _evento(error=str(error))
         except Exception:
@@ -646,3 +651,31 @@ def chatbot(request):
     respuesta["Cache-Control"] = "no-cache"
     respuesta["X-Accel-Buffering"] = "no"  # que el proxy de Render no lo retenga
     return respuesta
+
+
+@require_POST
+def asistente_registrar(request):
+    """Guarda en el caso los asientos que el asistente leyó de un enunciado."""
+    caso = caso_activo(request)
+    if caso is None:
+        return JsonResponse({"error": "No hay ningún caso abierto."}, status=400)
+    try:
+        texto = json.loads(request.body.decode("utf-8")).get("texto", "")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "No se pudo leer el enunciado."}, status=400)
+    if not isinstance(texto, str) or not texto.strip():
+        return JsonResponse({"error": "No se pudo leer el enunciado."}, status=400)
+
+    dominio = caso.a_dominio()
+    lectura = enunciados.leer(texto[:CHAT_MAX_CARACTERES], dominio)
+    if not lectura.asientos:
+        return JsonResponse({"error": "Ya no reconozco asientos en ese texto."}, status=400)
+
+    resultado = importar_asientos(caso, enunciados.a_importables(lectura, dominio))
+    return JsonResponse(
+        {
+            "guardados": resultado.importados,
+            "errores": resultado.errores,
+            "url": reverse("libro_diario"),
+        }
+    )

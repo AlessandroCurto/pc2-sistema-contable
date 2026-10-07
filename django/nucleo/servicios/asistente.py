@@ -24,6 +24,7 @@ from ..dominio.balance_comprobacion import construir_balance_comprobacion
 from ..dominio.balance_general import construir_balance_general
 from ..dominio.estado_resultados import construir_estado_resultados
 from ..dominio.tipos import Caso as CasoDominio
+from . import enunciados
 
 IGV = Decimal("0.18")
 
@@ -760,11 +761,28 @@ def _puntaje(ficha: Ficha, pregunta: str) -> float:
     return puntos
 
 
+def hay_enunciado(pregunta: str, caso: Optional[CasoDominio]) -> bool:
+    """¿El texto es un enunciado que se puede convertir en asientos?"""
+    if caso is None or not enunciados.parece_enunciado(pregunta):
+        return False
+    return bool(enunciados.leer(pregunta, caso).asientos)
+
+
 def responder(pregunta: str, caso: Optional[CasoDominio] = None) -> str:
     """La respuesta en markdown. Nunca lanza: siempre devuelve algo útil."""
     limpia = normalizar(pregunta).strip()
     if not limpia:
         return "Escríbeme una pregunta y te ayudo."
+
+    # Un enunciado pegado se resuelve, no se busca en las fichas.
+    if enunciados.parece_enunciado(pregunta):
+        if caso is None:
+            return (
+                "Eso parece un enunciado, y puedo resolverlo — pero necesito un caso "
+                "abierto para saber con qué plan de cuentas trabajar.\n\n"
+                "Ve a **Casos**, crea uno (o carga un ejemplo) y vuelve a pegármelo."
+            )
+        return enunciados.a_markdown(enunciados.leer(pregunta, caso), caso)
 
     puntuadas = sorted(
         ((_puntaje(f, limpia), f) for f in FICHAS), key=lambda par: par[0], reverse=True
@@ -799,4 +817,6 @@ def fue_entendida(pregunta: str) -> bool:
     limpia = normalizar(pregunta).strip()
     if not limpia:
         return False
+    if enunciados.parece_enunciado(pregunta):
+        return True
     return max((_puntaje(f, limpia) for f in FICHAS), default=0.0) >= UMBRAL

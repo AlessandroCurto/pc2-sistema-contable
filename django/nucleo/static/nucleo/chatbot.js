@@ -6,11 +6,13 @@
   'use strict';
 
   var RUTA = '/chatbot/';
+  var RUTA_REGISTRAR = '/asistente/registrar/';
   var MEMORIA = 'sgf:conversacion';
   var ABIERTO = 'sgf:asistente-abierto';
   var TOPE_GUARDADO = 40;
 
   var SUGERENCIAS = [
+    'Resolver un enunciado',
     '¿Cómo está mi caso?',
     '¿Por qué no cuadra?',
     '¿Cómo registro un asiento?',
@@ -39,6 +41,7 @@
     return escapar(texto)
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\[([^\]]+)\]\((\/[^)\s]*)\)/g, '<a href="$2">$1</a>')
       .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
   }
 
@@ -190,6 +193,52 @@
     return div;
   }
 
+  function botonRegistrar(texto) {
+    var caja = document.createElement('div');
+    caja.className = 'chat-accion';
+    var boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'chat-boton-accion';
+    boton.textContent = 'Registrar estos asientos en el caso';
+    var pie = document.createElement('p');
+    pie.className = 'chat-accion-pie';
+    pie.textContent = 'Revísalos antes. Se guardan en el Libro Diario.';
+    caja.appendChild(boton);
+    caja.appendChild(pie);
+    nodos.mensajes.appendChild(caja);
+    alFinal(true);
+
+    boton.addEventListener('click', function () {
+      boton.disabled = true;
+      boton.textContent = 'Registrando…';
+      fetch(RUTA_REGISTRAR, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': nodos.raiz.dataset.csrf || '',
+        },
+        body: JSON.stringify({ texto: texto }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          caja.remove();
+          if (d.error) { aviso(d.error); return; }
+          var hechos = pintar(
+            'Listo: guardé **' + d.guardados + ' asiento(s)** en el caso. ' +
+            'Los ves en el [Libro Diario](' + d.url + ').',
+            'assistant',
+            true
+          );
+          void hechos;
+          (d.errores || []).forEach(function (e) { aviso(e); });
+        })
+        .catch(function () {
+          caja.remove();
+          aviso('No se pudieron registrar. Inténtalo de nuevo.');
+        });
+    });
+  }
+
   function aviso(texto) {
     var div = document.createElement('div');
     div.className = 'chat-aviso';
@@ -218,6 +267,7 @@
     var esperando = puntos();
     var destino = null;
     var acumulado = '';
+    var accionPendiente = null;
     var control = new AbortController();
     cancelar = function () { control.abort(); };
 
@@ -263,6 +313,7 @@
               var dato;
               try { dato = JSON.parse(linea); } catch (_) { return; }
               if (dato.t) recibir(dato.t);
+              else if (dato.accion === 'registrar') accionPendiente = dato.texto;
               else if (dato.error) { esperando.remove(); aviso(dato.error); }
             });
             return leer();
@@ -286,6 +337,7 @@
             destino.remove();
           }
         }
+        if (accionPendiente) botonRegistrar(accionPendiente);
         ocupado = false;
         cancelar = null;
         refrescarBoton();

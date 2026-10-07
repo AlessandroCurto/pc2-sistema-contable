@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 91 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 114 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -88,13 +88,21 @@ Abajo a la derecha hay un botón con un robot que abre una conversación.
 **Funciona sin conexión a ninguna API y sin costo**: las respuestas se arman en el
 servidor (`servicios/asistente.py`). Hace tres cosas:
 
-1. **Revisa el caso abierto con sus cifras reales.** «¿Cómo está mi caso?» devuelve el
+1. **Resuelve un enunciado pegado.** `servicios/enunciados.py` reconoce el vocabulario
+   con el que están escritos estos casos (compra, venta, letras, arriendo, costo de ventas)
+   y arma los asientos con `Decimal`, así cuadran al céntimo. Mira hacia atrás cuando hace
+   falta: el valor de cada letra sale de la operación que las emitió, el *50% de la deuda*
+   del saldo inicial de proveedores, y el costo de ventas de las compras que ya leyó. Un
+   botón los registra en el caso, pasando por el mismo `importar_asientos()` que valida la
+   importación de Excel. La operación que no reconoce la informa en vez de inventarla, y
+   nunca propone un asiento descuadrado.
+2. **Revisa el caso abierto con sus cifras reales.** «¿Cómo está mi caso?» devuelve el
    resumen con sus importes; «¿por qué no cuadra?» recorre los asientos y nombra el que
    falla, con su diferencia. Aquí el asistente le gana a un modelo de lenguaje: no estima,
    lee el caso y usa el mismo motor contable que las pantallas.
-2. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
+3. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
    descargas, configuración y los cinco reportes.
-3. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
+4. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
    renta, costo de ventas, letras y el ciclo contable. También hace la cuenta si le pasas
    un monto («cuánto es el IGV de 1,000,000 incluido»).
 
