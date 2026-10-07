@@ -184,6 +184,58 @@ class CasosSueltosTest(TestCase):
         )
         self.assertTrue(any("error de tipeo" in a for a in lectura.avisos))
 
+    def test_la_deuda_de_los_clientes_es_cobranza_no_pago(self):
+        """El texto dice "deuda histórica", pero la deben los clientes."""
+        asiento = self._una(
+            "20/08/2024 - Cobranza a Clientes: Se cobra con cheque S/ 200,000.00 de la "
+            "deuda histórica que mantenían los clientes del inventario inicial."
+        )
+        montos = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas}
+        self.assertEqual(montos["102"][0], Decimal("200000.00"))   # entra al banco
+        self.assertEqual(montos["103"][1], Decimal("200000.00"))   # baja clientes
+        self.assertNotIn("201", montos)                            # no toca proveedores
+
+    def test_la_deuda_con_proveedores_sigue_siendo_pago(self):
+        """Hace falta la apertura: el porcentaje se calcula sobre ese saldo."""
+        lectura = enunciados.leer(
+            "La empresa X S.A.C. presenta el siguiente inventario inicial: "
+            "dinero en efectivo S/ 800,000, Mercaderías S/ 200,000, "
+            "Proveedores S/ 800,000 y capital S/ 200,000.\n"
+            "25/08/2024 - Amortización: Se cancela el 20% de la deuda histórica "
+            "(inventario inicial) que se mantenía con los proveedores, con cheque.",
+            self.dominio,
+        )
+        self.assertEqual(len(lectura.asientos), 2, lectura.problemas)
+        montos = {l.cuenta.codigo: (l.debe, l.haber) for l in lectura.asientos[1].lineas}
+        self.assertEqual(montos["201"][0], Decimal("160000.00"))   # 20% de 800,000
+
+    def test_venta_al_contado_sin_letras(self):
+        asiento = self._una(
+            "05/08/2024 - Venta al contado: Se venden mercaderías por un valor neto de "
+            "S/ 250,000.00 (más IGV). El cliente paga en efectivo."
+        )
+        montos = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas}
+        self.assertEqual(montos["101"][0], Decimal("295000.00"))
+        self.assertEqual(montos["401"][1], Decimal("250000.00"))
+        self.assertEqual(montos["203"][1], Decimal("45000.00"))
+
+    def test_los_sueldos_no_van_a_la_cuenta_de_arriendo(self):
+        asiento = self._una(
+            "15/08/2024 - Se pagan los sueldos del mes por S/ 90,000.00 mediante cheque."
+        )
+        nombres = [l.cuenta.nombre for l in asiento.lineas if l.debe]
+        self.assertIn("Personal", nombres[0])
+
+    def test_lee_la_fecha_escrita_con_letras(self):
+        datos = enunciados.datos_del_caso(
+            "La empresa Ferretería Los Andes S.R.L. presenta el siguiente inventario "
+            "inicial al 01 de agosto del 2024: efectivo S/ 900,000 y capital S/ 900,000.\n"
+            "31/08/2024 - Se pagan los sueldos por S/ 1,000.00 con cheque."
+        )
+        self.assertEqual(datos["nombre"], "Ferretería Los Andes S.R.L.")
+        self.assertEqual(datos["periodo_inicio"].isoformat(), "2024-08-01")
+        self.assertEqual(datos["periodo_fin"].isoformat(), "2024-08-31")
+
     def test_reconoce_un_enunciado_y_descarta_una_pregunta(self):
         self.assertTrue(enunciados.parece_enunciado(ENUNCIADO))
         self.assertFalse(enunciados.parece_enunciado("como registro un asiento"))

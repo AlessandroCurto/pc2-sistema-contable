@@ -219,6 +219,16 @@ class Lectura:
 # --------------------------------------------------------------- el lector
 
 FECHA = re.compile(r"\b(\d{1,2})\s*[/-]\s*(\d{1,2})\s*[/-]\s*(\d{2,4})\b")
+
+#: "al 01 de agosto del 2024": muchos enunciados fechan la apertura así.
+MESES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+    "julio": 7, "agosto": 8, "setiembre": 9, "septiembre": 9, "octubre": 10,
+    "noviembre": 11, "diciembre": 12,
+}
+FECHA_LARGA = re.compile(
+    r"\b(\d{1,2})\s+de\s+(" + "|".join(MESES) + r")\s+(?:de[l]?\s+)?(\d{4})\b"
+)
 PORCENTAJE = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
 CUENTA_LETRAS = re.compile(r"\b(\d{1,3})\s+(?:de\s+(?:las|los)\s+)?letras\b")
 NUMERO_DE_LETRA = re.compile(r"n\s*[.°ºor]*\s*\d+(?:\s*(?:,|y)\s*\d+)*", re.IGNORECASE)
@@ -269,7 +279,13 @@ def _a_decimal(crudo: str) -> Decimal:
 def _fecha(texto: str) -> Optional[date]:
     hallada = FECHA.search(texto)
     if not hallada:
-        return None
+        larga = FECHA_LARGA.search(_plano(texto))
+        if not larga:
+            return None
+        try:
+            return date(int(larga.group(3)), MESES[larga.group(2)], int(larga.group(1)))
+        except ValueError:
+            return None
     dia, mes, anio = (int(parte) for parte in hallada.groups())
     if anio < 100:
         anio += 2000
@@ -328,10 +344,16 @@ def _clasificar(texto: str) -> Optional[str]:
         if hay("cliente", "cobranza", "cobra"):
             return "cobranza"
 
+    # "La deuda histórica que mantenían los clientes" es una cobranza, no un
+    # pago: lo que decide es de quién es la deuda, no la palabra "deuda".
+    cobro = hay("cobranza", "se cobra", "cobra con", "cobra a", "nos cancela",
+                "el cliente cancela", "los clientes cancelan")
+    if cobro and "proveedor" not in plano:
+        return "cobranza"
     if hay("amortizacion", "deuda historica", "deuda que se mantenia",
            "abona a la deuda", "amortiza"):
         return "amortizacion"
-    if hay("cobranza", "nos cancela", "el cliente cancela", "cobra a"):
+    if cobro:
         return "cobranza"
     if hay("arriendo", "alquiler", "gasto operativo", "sueldos", "remuneraciones",
            "publicidad", "servicios basicos", "se paga el"):
@@ -884,6 +906,11 @@ def datos_del_caso(texto: str) -> dict:
             anio += 2000
         try:
             fechas.append(date(anio, int(mes), int(dia)))
+        except ValueError:
+            continue
+    for dia, mes, anio in FECHA_LARGA.findall(_plano(texto)):
+        try:
+            fechas.append(date(int(anio), MESES[mes], int(dia)))
         except ValueError:
             continue
     # Si el enunciado mezcla años (suele ser un tipeo), se usa el más repetido.
