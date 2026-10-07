@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 146 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 154 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -82,9 +82,11 @@ El PDF reemplaza a jsPDF y el Excel es nuevo: en el navegador no tenía sentido,
 pero con Python una hoja de cálculo sale casi gratis y el profesor suele pedir
 los cuadros en Excel.
 
-## El asistente
+## El asistente: MULUNI
 
-Abajo a la derecha hay un botón con un robot que abre una conversación.
+Abajo a la derecha hay un botón con un burrito que abre una conversación.
+El dibujo es `static/nucleo/muluni.svg`, hecho a mano: si algún día se quiere un
+render 3D de verdad, se reemplaza ese archivo y nada más.
 **Funciona sin conexión a ninguna API y sin costo**: las respuestas se arman en el
 servidor (`servicios/asistente.py`). Hace tres cosas:
 
@@ -102,9 +104,11 @@ servidor (`servicios/asistente.py`). Hace tres cosas:
    resumen con sus importes; «¿por qué no cuadra?» recorre los asientos y nombra el que
    falla, con su diferencia. Aquí el asistente le gana a un modelo de lenguaje: no estima,
    lee el caso y usa el mismo motor contable que las pantallas.
-3. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
+3. **Cambia de caso.** «Abre el caso CYBERTEC» lo busca por nombre (aunque venga a
+   medias), lo abre y recarga la pantalla. Si no existe, lo dice y lista los que hay.
+4. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
    descargas, configuración y los cinco reportes.
-4. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
+5. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
    renta, costo de ventas, letras y el ciclo contable. También hace la cuenta si le pasas
    un monto («cuánto es el IGV de 1,000,000 incluido»).
 

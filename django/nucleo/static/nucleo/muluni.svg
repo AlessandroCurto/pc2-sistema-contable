@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MULUNI">
+  <title>MULUNI</title>
+  <defs>
+    <!-- Pelaje: la luz entra por arriba a la izquierda, como en un render. -->
+    <radialGradient id="mu-pelaje" cx="36%" cy="24%" r="78%">
+      <stop offset="0%" stop-color="#d9cbbb" />
+      <stop offset="52%" stop-color="#b9a794" />
+      <stop offset="100%" stop-color="#8d7c6b" />
+    </radialGradient>
+    <radialGradient id="mu-hocico" cx="40%" cy="28%" r="80%">
+      <stop offset="0%" stop-color="#f6ece1" />
+      <stop offset="70%" stop-color="#e3d3c3" />
+      <stop offset="100%" stop-color="#cbb8a6" />
+    </radialGradient>
+    <radialGradient id="mu-oreja" cx="42%" cy="26%" r="80%">
+      <stop offset="0%" stop-color="#cdbdac" />
+      <stop offset="100%" stop-color="#9c8977" />
+    </radialGradient>
+    <linearGradient id="mu-interior" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d79d94" />
+      <stop offset="100%" stop-color="#b87b73" />
+    </linearGradient>
+    <linearGradient id="mu-crin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6f6054" />
+      <stop offset="100%" stop-color="#4e423a" />
+    </linearGradient>
+    <!-- El brillo ancho de la frente es lo que da la sensación de volumen. -->
+    <radialGradient id="mu-brillo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".5" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Orejas -->
+  <g>
+    <ellipse cx="18.5" cy="15.5" rx="6.1" ry="12.4"
+             fill="url(#mu-oreja)" transform="rotate(-17 18.5 15.5)" />
+    <ellipse cx="18.8" cy="15.8" rx="2.9" ry="8"
+             fill="url(#mu-interior)" transform="rotate(-17 18.8 15.8)" />
+    <ellipse cx="45.5" cy="15.5" rx="6.1" ry="12.4"
+             fill="url(#mu-oreja)" transform="rotate(17 45.5 15.5)" />
+    <ellipse cx="45.2" cy="15.8" rx="2.9" ry="8"
+             fill="url(#mu-interior)" transform="rotate(17 45.2 15.8)" />
+  </g>
+
+  <!-- Cabeza -->
+  <ellipse cx="32" cy="35" rx="19.5" ry="17.6" fill="url(#mu-pelaje)" />
+
+  <!-- Crin -->
+  <path d="M23.4 20.6c1.5-3.6 3.6-5.6 5.4-5.2-1 1.5-1.2 3.1-.6 4.8
+           1.9-3.4 3.9-5 5.8-4.6-1 1.6-1.2 3.3-.5 5
+           1.9-3.1 3.8-4.5 5.6-4.1-1.6 1.9-2.2 4-1.8 6.2z"
+        fill="url(#mu-crin)" />
+
+  <!-- Hocico -->
+  <ellipse cx="32" cy="43.2" rx="12.6" ry="9.4" fill="url(#mu-hocico)" />
+  <ellipse cx="27.6" cy="41.4" rx="1.55" ry="2.05" fill="#8b7566" opacity=".88" />
+  <ellipse cx="36.4" cy="41.4" rx="1.55" ry="2.05" fill="#8b7566" opacity=".88" />
+  <path d="M27.4 47.4q4.6 2.9 9.2 0" stroke="#a8907e" stroke-width="1.5"
+        stroke-linecap="round" fill="none" opacity=".75" />
+
+  <!-- Ojos -->
+  <ellipse cx="23.6" cy="31.4" rx="4" ry="4.3" fill="#3b2f28" />
+  <ellipse cx="40.4" cy="31.4" rx="4" ry="4.3" fill="#3b2f28" />
+  <circle cx="22.3" cy="29.9" r="1.45" fill="#fff" opacity=".95" />
+  <circle cx="39.1" cy="29.9" r="1.45" fill="#fff" opacity=".95" />
+  <circle cx="24.9" cy="33.1" r=".72" fill="#fff" opacity=".5" />
+  <circle cx="41.7" cy="33.1" r=".72" fill="#fff" opacity=".5" />
+
+  <!-- Volumen de la frente y los cachetes -->
+  <ellipse cx="27" cy="25.5" rx="10" ry="6.6" fill="url(#mu-brillo)" />
+  <ellipse cx="17.6" cy="38.6" rx="3.5" ry="2.6" fill="#c98f86" opacity=".32" />
+  <ellipse cx="46.4" cy="38.6" rx="3.5" ry="2.6" fill="#c98f86" opacity=".32" />
+</svg>

@@ -930,3 +930,34 @@ def fue_entendida(pregunta: str) -> bool:
     if enunciados.parece_enunciado(pregunta):
         return True
     return max((_puntaje(f, limpia) for f in FICHAS), default=0.0) >= UMBRAL
+
+
+# ------------------------------------------------------- abrir otro caso
+
+_VERBOS_ABRIR = (
+    r"abre|abrir|abras|abreme|abrime|cambia|cambiar|cambiame|pasa|pasar|"
+    r"selecciona|seleccionar|carga|cargar|usa|usar|trabajar|muestrame|ponme"
+)
+#: Lo que viene después del verbo y no nombra a ningún caso guardado.
+_NO_ES_NOMBRE = {
+    "", "nuevo", "un caso", "un caso nuevo", "uno nuevo", "otro", "otro caso",
+    "casos", "los casos", "mis casos", "un caso de ejemplo", "el caso", "caso",
+}
+
+
+def caso_pedido(pregunta: str) -> Optional[str]:
+    """El nombre del caso que pide abrir, o None si no está pidiendo eso."""
+    limpia = normalizar(pregunta).strip().rstrip("?!. ")
+    if not re.search(r"\b(" + _VERBOS_ABRIR + r")\b", limpia):
+        return None
+
+    despues = re.search(r"\bcaso\b\s*(?:llamado\s+|de\s+|:\s*)?(.+)$", limpia)
+    if despues is None:
+        despues = re.search(
+            r"\b(?:" + _VERBOS_ABRIR + r")\b\s+(?:a\s+|al\s+|el\s+|la\s+)?(.+)$", limpia
+        )
+    if despues is None:
+        return None
+
+    nombre = despues.group(1).strip(" \"'«»")
+    return None if nombre in _NO_ES_NOMBRE else (nombre or None)

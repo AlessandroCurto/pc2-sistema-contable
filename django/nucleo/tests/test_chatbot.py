@@ -474,3 +474,74 @@ class PreguntasPorUnaCifraTest(TestCase):
         """«impuesto a la renta» a secas es teoría, no una consulta del caso."""
         respuesta = asistente.responder("impuesto a la renta", None)
         self.assertIn("tercera categoría", respuesta)
+
+
+class AbrirOtroCasoTest(TestCase):
+    """«Abre el caso X» cambia de caso sin salir del chat."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.sur = crear_caso_demo(COMERCIALIZADORA_SUR)
+        cls.cybertec = crear_caso_demo(CYBERTEC)
+
+    def _pedir(self, texto):
+        respuesta = self.client.post(
+            reverse("chatbot"),
+            data=json.dumps({"mensajes": [{"role": "user", "content": texto}]}),
+            content_type="application/json",
+        )
+        return b"".join(respuesta.streaming_content).decode("utf-8")
+
+    def test_reconoce_la_intencion(self):
+        for frase, esperado in [
+            ("abre el caso CYBERTEC", "cybertec"),
+            ("quiero que abras el caso Comercializadora del Sur", "comercializadora del sur"),
+            ("ábreme el caso CYBERTEC S.A.", "cybertec s.a"),
+            ("cambia al caso CYBERTEC", "cybertec"),
+            ("carga el caso Los Andes", "los andes"),
+        ]:
+            with self.subTest(frase=frase):
+                self.assertEqual(asistente.caso_pedido(frase), esperado)
+
+    def test_no_confunde_otras_preguntas(self):
+        for frase in ("como creo un caso nuevo", "que es la partida doble",
+                      "como esta mi caso", "cuantos casos tengo", "abre un caso nuevo"):
+            with self.subTest(frase=frase):
+                self.assertIsNone(asistente.caso_pedido(frase))
+
+    def test_abre_el_caso_y_pide_recargar(self):
+        self.client.post(reverse("caso_abrir", args=[self.sur.pk]))
+        cuerpo = self._pedir("abre el caso CYBERTEC")
+        self.assertIn("CYBERTEC S.A.", cuerpo)
+        self.assertIn('"accion": "recargar"', cuerpo)
+        self.assertEqual(self.client.session["caso_activo_id"], self.cybertec.pk)
+
+    def test_encuentra_el_caso_aunque_el_nombre_venga_a_medias(self):
+        self.client.post(reverse("caso_abrir", args=[self.cybertec.pk]))
+        self._pedir("quiero que abras el caso comercializadora del sur")
+        self.assertEqual(self.client.session["caso_activo_id"], self.sur.pk)
+
+    def test_si_no_existe_lo_dice_y_lista_los_que_hay(self):
+        cuerpo = self._pedir("abre el caso Panaderia La Esperanza")
+        self.assertIn("No encontré", cuerpo)
+        self.assertIn("CYBERTEC S.A.", cuerpo)
+        self.assertNotIn("recargar", cuerpo)
+
+    def test_no_cambia_de_caso_si_no_encuentra(self):
+        self.client.post(reverse("caso_abrir", args=[self.sur.pk]))
+        self._pedir("abre el caso Panaderia La Esperanza")
+        self.assertEqual(self.client.session["caso_activo_id"], self.sur.pk)
+
+
+class MuluniTest(TestCase):
+    def test_la_pagina_entrega_el_avatar(self):
+        respuesta = self.client.get(reverse("casos"))
+        self.assertContains(respuesta, "muluni.svg")
+        self.assertContains(respuesta, "data-avatar")
+
+    def test_el_chat_se_llama_muluni(self):
+        from django.conf import settings
+
+        js = (settings.BASE_DIR / "nucleo/static/nucleo/chatbot.js").read_text(encoding="utf-8")
+        self.assertIn("<strong>MULUNI</strong>", js)
+        self.assertNotIn("Asistente contable</strong>", js)

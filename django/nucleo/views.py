@@ -596,6 +596,33 @@ def _mensajes_validos(crudos):
     return limpios
 
 
+def _elegir_caso(texto: str):
+    """El caso guardado cuyo nombre más se parece a lo que pidió."""
+    objetivo = asistente.normalizar(texto).strip()
+    if not objetivo:
+        return None
+    palabras = set(objetivo.split())
+    mejor, puntos = None, 0.0
+    for caso in Caso.objects.all():
+        for etiqueta in (caso.nombre, caso.razon_social):
+            limpia = asistente.normalizar(etiqueta or "").strip()
+            if not limpia:
+                continue
+            if limpia == objetivo:
+                return caso
+            propio = set(limpia.split())
+            compartidas = palabras & propio
+            if not compartidas:
+                continue
+            # Proporción de lo que pidió que aparece en el nombre del caso.
+            puntaje = len(compartidas) / len(palabras)
+            if objetivo in limpia or limpia in objetivo:
+                puntaje += 1
+            if puntaje > puntos:
+                mejor, puntos = caso, puntaje
+    return mejor if puntos >= 0.5 else None
+
+
 def _evento(**datos) -> str:
     return "data: " + json.dumps(datos, ensure_ascii=False) + "\n\n"
 
@@ -618,11 +645,32 @@ def chatbot(request):
             status=429,
         )
 
+    pregunta = mensajes[-1]["content"]
+
+    # "abre el caso X": se cambia de caso y se le pide a la pantalla recargar.
+    pedido = asistente.caso_pedido(pregunta)
+    if pedido:
+        elegido = _elegir_caso(pedido)
+        if elegido is not None:
+            abrir_caso(request, elegido)
+            texto = (
+                f"Listo, abrí **{elegido.nombre}** "
+                f"({elegido.cuentas.count()} cuentas, {elegido.asientos.count()} asientos). "
+                "Recargo la pantalla para que lo veas."
+            )
+            return _respuesta_en_vivo([_evento(t=texto), _evento(accion="recargar")])
+        nombres = list(Caso.objects.values_list("nombre", flat=True))
+        if nombres:
+            disponibles = "Tienes guardados:\n\n" + "\n".join("- " + n for n in nombres)
+        else:
+            disponibles = "No tienes ningún caso guardado todavía."
+        texto = f"No encontré ningún caso que se llame «{pedido}».\n\n{disponibles}"
+        return _respuesta_en_vivo([_evento(t=texto), _evento(fin=True)])
+
     caso = caso_activo(request)
     dominio = caso.a_dominio() if caso is not None else None
 
     # La API solo entra si está configurada y si al sitio le queda cupo hoy.
-    pregunta = mensajes[-1]["content"]
     permitir_api = (
         chatbot_servicio.hay_api()
         and not asistente.fue_entendida(pregunta)
@@ -647,7 +695,11 @@ def chatbot(request):
             )
         yield _evento(fin=True)
 
-    respuesta = StreamingHttpResponse(flujo(), content_type="text/event-stream")
+    return _respuesta_en_vivo(flujo())
+
+
+def _respuesta_en_vivo(trozos) -> StreamingHttpResponse:
+    respuesta = StreamingHttpResponse(trozos, content_type="text/event-stream")
     respuesta["Cache-Control"] = "no-cache"
     respuesta["X-Accel-Buffering"] = "no"  # que el proxy de Render no lo retenga
     return respuesta

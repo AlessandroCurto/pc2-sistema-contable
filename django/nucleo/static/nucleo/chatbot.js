@@ -13,6 +13,7 @@
 
   var SUGERENCIAS = [
     'Resolver un enunciado',
+    'Abre el caso...',
     '¿Cómo está mi caso?',
     '¿Por qué no cuadra?',
     '¿Cómo registro un asiento?',
@@ -272,6 +273,7 @@
     var destino = null;
     var acumulado = '';
     var accionPendiente = null;
+    var recargar = false;
     var control = new AbortController();
     cancelar = function () { control.abort(); };
 
@@ -318,6 +320,7 @@
               try { dato = JSON.parse(linea); } catch (_) { return; }
               if (dato.t) recibir(dato.t);
               else if (dato.accion === 'registrar') accionPendiente = dato.texto;
+              else if (dato.accion === 'recargar') recargar = true;
               else if (dato.error) { esperando.remove(); aviso(dato.error); }
             });
             return leer();
@@ -342,6 +345,7 @@
           }
         }
         if (accionPendiente) botonRegistrar(accionPendiente);
+        if (recargar) { guardar(); setTimeout(function () { location.reload(); }, 900); }
         ocupado = false;
         cancelar = null;
         refrescarBoton();
@@ -384,8 +388,9 @@
 
   function bienvenida(animar) {
     var div = pintar(
-      'Soy tu asistente contable. Puedo revisar el caso que tienes abierto con sus ' +
-        'cifras reales, explicarte la teoría y guiarte por el sistema. ¿Qué necesitas?',
+      'Hola, soy **MULUNI**. Puedo resolver un enunciado que me pegues, revisar el caso ' +
+        'que tienes abierto con sus cifras reales, abrirte otro caso y explicarte la ' +
+        'teoría. ¿Qué necesitas?',
       'assistant',
       animar
     );
@@ -394,40 +399,26 @@
 
   /* ----------------------------------------------------------------- init */
 
-  function construir() {
+  function construir(avatar) {
     var raiz = document.createElement('div');
     raiz.className = 'chat-raiz';
     raiz.innerHTML =
       '<button class="chat-boton" type="button" aria-expanded="false" aria-controls="chat-panel"' +
-      ' aria-label="Abrir el asistente contable">' +
-        '<svg class="chat-boton-robot" width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">' +
-          '<path d="M16 4.5V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-          '<circle cx="16" cy="3.2" r="1.8" fill="currentColor"/>' +
-          '<rect x="5.5" y="7.5" width="21" height="16" rx="5.5" fill="currentColor"/>' +
-          '<circle class="chat-ojo chat-ojo-i" cx="11.8" cy="14.2" r="2.3" fill="#0a0a0a"/>' +
-          '<circle class="chat-ojo chat-ojo-d" cx="20.2" cy="14.2" r="2.3" fill="#0a0a0a"/>' +
-          '<path d="M12.4 19.2h7.2" stroke="#0a0a0a" stroke-width="2" stroke-linecap="round"/>' +
-          '<path d="M3 13v4M29 13v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-        '</svg>' +
+      ' aria-label="Abrir a MULUNI, el asistente contable">' +
+        '<img class="chat-boton-avatar" alt="" width="40" height="40" src="' + avatar + '">' +
         '<svg class="chat-boton-cerrar" width="22" height="22" viewBox="0 0 24 24" fill="none"' +
         ' stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">' +
           '<path d="M6 6l12 12M18 6L6 18"/>' +
         '</svg>' +
       '</button>' +
 
-      '<section class="chat-panel" id="chat-panel" role="dialog" aria-label="Asistente contable" inert>' +
+      '<section class="chat-panel" id="chat-panel" role="dialog" aria-label="MULUNI, asistente contable" inert>' +
         '<header class="chat-cabecera">' +
           '<span class="chat-insignia" aria-hidden="true">' +
-            '<svg width="20" height="20" viewBox="0 0 32 32">' +
-              '<rect x="5.5" y="7.5" width="21" height="16" rx="5.5" fill="#0a0a0a"/>' +
-              '<circle cx="11.8" cy="14.2" r="2.3" fill="#f2c200"/>' +
-              '<circle cx="20.2" cy="14.2" r="2.3" fill="#f2c200"/>' +
-              '<path d="M12.4 19.2h7.2" stroke="#f2c200" stroke-width="2" stroke-linecap="round"/>' +
-              '<path d="M16 4.5V7" stroke="#0a0a0a" stroke-width="2" stroke-linecap="round"/>' +
-            '</svg>' +
+            '<img alt="" width="26" height="26" src="' + avatar + '">' +
           '</span>' +
           '<span class="chat-cabecera-texto">' +
-            '<strong>Asistente contable</strong>' +
+            '<strong>MULUNI</strong>' +
             '<span class="chat-cabecera-pie" data-caso></span>' +
           '</span>' +
           '<button class="chat-icono-boton" type="button" data-limpiar hidden' +
@@ -462,7 +453,8 @@
   }
 
   function init() {
-    var raiz = construir();
+    var meta = document.getElementById('chat-datos');
+    var raiz = construir((meta && meta.dataset.avatar) || '');
     nodos = {
       raiz: raiz,
       boton: raiz.querySelector('.chat-boton'),
@@ -476,7 +468,6 @@
       form: raiz.querySelector('[data-form]'),
     };
 
-    var meta = document.getElementById('chat-datos');
     raiz.dataset.csrf = (meta && meta.dataset.csrf) || '';
     var caso = (meta && meta.dataset.caso) || '';
     nodos.pie.textContent = caso ? 'Viendo: ' + caso : 'Sin ningún caso abierto';
