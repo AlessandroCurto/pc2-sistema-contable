@@ -148,8 +148,8 @@ METROPOLITANA = PlantillaCaso(
         ),
         AsientoDemo(
             fecha=date(2023, 6, 15),
-            glosa="Cobro de las letras 101 y 102 a Mario Cea Castro",
-            lineas=[_debe("101", 142800), _haber("104", 142800)],
+            glosa="Cobro con cheque de las letras 101 y 102 a Mario Cea Castro",
+            lineas=[_debe("102", 142800), _haber("104", 142800)],
         ),
         AsientoDemo(
             fecha=date(2023, 6, 30),
@@ -223,7 +223,7 @@ COMERCIALIZADORA_SUR = PlantillaCaso(
         AsientoDemo(
             fecha=date(2024, 6, 15),
             glosa="Cobro con cheque de las letras 101 y 102 de Mario Cea Castro",
-            lineas=[_debe("101", 141600), _haber("104", 141600)],
+            lineas=[_debe("102", 141600), _haber("104", 141600)],
         ),
         AsientoDemo(
             fecha=date(2024, 6, 30),

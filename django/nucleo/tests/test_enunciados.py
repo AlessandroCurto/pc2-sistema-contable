@@ -110,6 +110,30 @@ class LeerElCasoCompletoTest(TestCase):
         self.assertIn("70,800.00", texto)   # el valor de cada letra
         self.assertIn("9,170,697.63", texto)
 
+    def test_un_cobro_con_cheque_entra_al_banco_y_no_a_la_caja(self):
+        """Lo detectó un compañero: la glosa decía cheque y cargaba a Caja."""
+        asiento = self._asiento("cobro de letras")
+        destinos = [l.cuenta.codigo for l in asiento.lineas if l.debe]
+        self.assertEqual(destinos, ["102"])          # Banco
+        self.assertNotIn("101", destinos)            # no Caja
+
+    def test_coincide_con_el_caso_de_ejemplo_guardado(self):
+        """El caso escrito a mano y lo que se lee del enunciado no pueden diferir."""
+        from ..datos.casos_demo import COMERCIALIZADORA_SUR, crear_caso_demo
+
+        guardado = crear_caso_demo(COMERCIALIZADORA_SUR)
+        a_mano = sorted(
+            (linea.cuenta.codigo, linea.debe, linea.haber)
+            for asiento in guardado.asientos.all()
+            for linea in asiento.lineas.all()
+        )
+        leido = sorted(
+            (linea.cuenta.codigo, linea.debe, linea.haber)
+            for asiento in self.lectura.asientos
+            for linea in asiento.lineas
+        )
+        self.assertEqual(leido, a_mano)
+
     def test_registrarlos_deja_el_caso_cuadrado(self):
         from ..servicios.casos import importar_asientos
 

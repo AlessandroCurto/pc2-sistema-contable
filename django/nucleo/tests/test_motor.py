@@ -240,3 +240,34 @@ class FerreteriaLosAndesTest(TestCase):
         general = construir_balance_general(self.caso)
         self.assertTrue(general.resultado_neto_de_impuesto)
         self.assertEqual(general.resultado_ejercicio, estado.utilidad_neta)
+
+
+class CobrosConChequeTest(TestCase):
+    """Un cheque recibido se deposita: entra al banco, no a la caja."""
+
+    def test_en_los_casos_de_ejemplo(self):
+        from ..datos.casos_demo import PLANTILLAS_CASO
+
+        for plantilla in PLANTILLAS_CASO:
+            for asiento in plantilla.asientos:
+                if "cheque" not in asiento.glosa.lower():
+                    continue
+                for linea in asiento.lineas:
+                    with self.subTest(caso=plantilla.id, glosa=asiento.glosa[:40]):
+                        self.assertNotEqual(
+                            linea.codigo, "101",
+                            "un movimiento con cheque no puede tocar Caja",
+                        )
+                        self.assertNotEqual(linea.codigo, "10", "idem en el PCGE")
+
+    def test_los_saldos_de_caja_y_banco_del_caso_del_sur(self):
+        caso = crear_caso_demo(COMERCIALIZADORA_SUR).a_dominio()
+        saldos = {
+            item.cuenta.codigo: item.saldo
+            for grupo in construir_libro_mayor(caso).grupos
+            for item in grupo.cuentas
+        }
+        self.assertEqual(saldos["101"], Decimal("2688800"))   # caja
+        self.assertEqual(saldos["102"], Decimal("2841600"))   # banco
+        # El total no cambia: solo se movió de una cuenta a la otra.
+        self.assertEqual(saldos["101"] + saldos["102"], Decimal("5530400"))
