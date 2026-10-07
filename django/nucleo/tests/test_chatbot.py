@@ -800,3 +800,62 @@ class CalculadoraTest(TestCase):
                          "que tasa usas", "como esta mi caso"):
             with self.subTest(pregunta=pregunta):
                 self.assertIsNone(asistente.expresion_aritmetica(pregunta))
+
+
+class CuantoDineroTieneTest(TestCase):
+    """«¿Cuánto dinero tiene?» no se entendía, y es de lo primero que se pregunta."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.dominio = crear_caso_demo(COMERCIALIZADORA_SUR).a_dominio()
+
+    def test_lo_entiende_de_varias_formas(self):
+        for pregunta in ("cuanto de dinero tiene", "cuanta plata tiene", "cuanto efectivo hay",
+                         "cuanto dinero queda", "cuanto tengo disponible", "liquidez"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIn("5,530,400.00", asistente.responder(pregunta, self.dominio))
+
+    def test_suma_solo_caja_y_banco(self):
+        respuesta = asistente.responder("cuanto dinero tiene", self.dominio)
+        self.assertIn("2,688,800.00", respuesta)   # caja
+        self.assertIn("2,841,600.00", respuesta)   # banco
+
+    def test_aclara_que_el_resto_del_activo_no_es_dinero(self):
+        respuesta = asistente.responder("cuanto dinero tiene", self.dominio)
+        self.assertIn("todavía no es dinero", respuesta)
+        self.assertIn("Mercaderías", respuesta)
+        self.assertIn("7,114,902.37", respuesta)   # el activo total, para contrastar
+
+
+class FlujoDeEfectivoTest(TestCase):
+    """«¿A dónde se fue la plata?» pide el recorrido, no el saldo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.dominio = crear_caso_demo(COMERCIALIZADORA_SUR).a_dominio()
+
+    def test_lo_entiende_de_varias_formas(self):
+        for pregunta in ("a donde se fue la plata", "como se movio el dinero",
+                         "flujo de efectivo", "en que se gasto", "movimientos de caja",
+                         "por que tengo menos plata"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIn("Cómo se movió el dinero",
+                              asistente.responder(pregunta, self.dominio))
+
+    def test_lista_las_entradas_y_las_salidas(self):
+        respuesta = asistente.responder("a donde se fue la plata", self.dominio)
+        self.assertIn("188,800.00", respuesta)    # venta en efectivo
+        self.assertIn("141,600.00", respuesta)    # cobro de letras
+        self.assertIn("400,000.00", respuesta)    # pago a proveedores
+        self.assertIn("300,000.00", respuesta)    # pago de letras
+
+    def test_explica_que_ganar_no_es_tener_caja(self):
+        respuesta = asistente.responder("flujo de efectivo", self.dominio)
+        self.assertIn("469,600.00", respuesta)    # lo que bajó la caja
+        self.assertIn("100,746.17", respuesta)    # lo que ganó
+        self.assertIn("Ganancia y caja no son lo mismo", respuesta)
+
+    def test_no_se_confunde_con_la_cifra_suelta(self):
+        """«cuánto dinero» da el saldo; «a dónde se fue» da el recorrido."""
+        self.assertIsNotNone(asistente.cifra_pedida("cuanto dinero tiene"))
+        self.assertIsNone(asistente.cifra_pedida("a donde se fue la plata"))

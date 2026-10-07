@@ -13,6 +13,7 @@
 
   var SUGERENCIAS = [
     'Conclusiones del caso',
+    '¿Cuánto dinero tiene?',
     'Resolver un enunciado',
     'Abre el caso...',
     '¿Cómo está mi caso?',

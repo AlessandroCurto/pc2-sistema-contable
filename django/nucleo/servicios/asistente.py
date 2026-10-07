@@ -271,6 +271,10 @@ CIFRAS: List[tuple] = [
     ("Total del patrimonio", "balance", ("patrimonio",), lambda e, g, b: g.total_patrimonio),
     ("Suma del Debe", "balance", ("total del debe", "suma del debe", "total movido"),
      lambda e, g, b: b.total_debe),
+    ("Dinero disponible", "efectivo",
+     ("dinero", "plata", "efectivo", "liquidez", "caja y banco", "en caja", "en el banco",
+      "cuanto tengo", "disponible"),
+     lambda e, g, b: _efectivo(g)),
     ("Utilidad neta", "resultado", ("utilidad", "ganancia"), lambda e, g, b: e.utilidad_neta),
 ]
 
@@ -286,6 +290,11 @@ QUIERE_TEORIA = (
     # Preguntas sobre los parámetros del propio sistema, no sobre el caso.
     "que tasa", "que porcentaje", "que igv", "cual es la tasa", "usas", "aplicas",
     "trabajas", "manejas", "redondeas",
+    # Piden el recorrido del dinero, no su saldo.
+    "se fue", "se movio", "flujo", "entradas y salidas", "en que se gasto",
+    "movimientos", "de donde salio",
+    # Un "por qué" pide una explicación, nunca un saldo.
+    "por que",
 )
 
 
@@ -318,7 +327,27 @@ def _responder_cifra(indice: int, caso: Optional[CasoDominio]) -> str:
         "",
     ]
 
-    if grupo == "resultado":
+    if grupo == "efectivo":
+        partes.append("Es la suma de las cuentas que son dinero de verdad:")
+        partes.append("")
+        partes.append(f"| Cuenta | {simbolo} |")
+        partes.append("| --- | ---: |")
+        for detalle in _cuentas_de_dinero(general):
+            partes.append(
+                f"| {detalle.cuenta.codigo} {detalle.cuenta.nombre} | {_n(detalle.monto)} |"
+            )
+        partes.append(f"| **Disponible** | **{_n(_efectivo(general))}** |")
+        otras = [d for d in general.activo_corriente.cuentas
+                 if d not in list(_cuentas_de_dinero(general))]
+        if otras:
+            nombres = ", ".join(d.cuenta.nombre for d in otras)
+            partes += [
+                "",
+                f"El activo total es {simbolo} {_n(general.total_activo)}, pero el resto "
+                f"**todavía no es dinero**: {nombres}. Hay que cobrarlo o venderlo primero.",
+            ]
+        partes.append("\nSi quieres ver cómo se movió, pregúntame *a dónde se fue la plata*.")
+    elif grupo == "resultado":
         partes += [
             "De dónde sale:",
             "",
@@ -358,6 +387,92 @@ def _responder_cifra(indice: int, caso: Optional[CasoDominio]) -> str:
         "\nSi lo que querías era la explicación y no el número, pregúntame "
         "*cómo se calcula* eso mismo."
     )
+    return "\n".join(partes)
+
+
+def _cuentas_de_dinero(general):
+    """Las cuentas del balance que son dinero de verdad: caja y banco."""
+    for detalle in general.activo_corriente.cuentas:
+        nombre = normalizar(detalle.cuenta.nombre)
+        if any(p in nombre for p in ("caja", "efectivo", "banco", "cuenta corriente")):
+            yield detalle
+
+
+def _efectivo(general) -> Decimal:
+    return sum((d.monto for d in _cuentas_de_dinero(general)), Decimal("0.00"))
+
+
+def _movimientos_de_dinero(caso: CasoDominio):
+    """Entradas y salidas de caja y banco, asiento por asiento."""
+    dinero = set()
+    for cuenta in caso.cuentas:
+        nombre = normalizar(cuenta.nombre)
+        if any(p in nombre for p in ("caja", "efectivo", "banco", "cuenta corriente")):
+            dinero.add(cuenta.id)
+    for asiento in sorted(caso.asientos, key=lambda a: (a.fecha, a.numero)):
+        entra = sum((l.debe for l in asiento.lineas if l.cuenta_id in dinero), Decimal("0"))
+        sale = sum((l.haber for l in asiento.lineas if l.cuenta_id in dinero), Decimal("0"))
+        if entra or sale:
+            yield asiento, entra, sale
+
+
+def _flujo_de_efectivo(caso: Optional[CasoDominio]) -> str:
+    """De dónde salió y a dónde se fue la plata. Ganancia no es caja."""
+    if caso is None:
+        return SIN_CASO
+    if not caso.asientos:
+        return "El caso no tiene asientos, así que no hay movimientos de dinero."
+    simbolo = caso.empresa.simbolo_moneda
+    general = construir_balance_general(caso)
+    estado = construir_estado_resultados(caso)
+    movimientos = list(_movimientos_de_dinero(caso))
+    if not movimientos:
+        return "En este caso no hay movimientos de caja ni de banco."
+
+    # El primer asiento suele ser la apertura: ese saldo es el punto de partida.
+    primero, entra, _ = movimientos[0]
+    apertura = entra if len(primero.lineas) > 2 and not any(
+        l.haber for l in primero.lineas if l.debe == 0) else Decimal("0")
+    inicial = entra if "inicial" in normalizar(primero.glosa) else Decimal("0")
+
+    partes = [
+        "## Cómo se movió el dinero",
+        "",
+        "| Fecha | Operación | Entra | Sale |",
+        "| --- | --- | ---: | ---: |",
+    ]
+    total_entra = total_sale = Decimal("0.00")
+    for asiento, entra, sale in movimientos:
+        partes.append(
+            f"| {asiento.fecha:%d/%m} | {asiento.glosa[:44]} "
+            f"| {_n(entra) if entra else ''} | {_n(sale) if sale else ''} |"
+        )
+        total_entra += entra
+        total_sale += sale
+    partes.append(f"| | **Totales** | **{_n(total_entra)}** | **{_n(total_sale)}** |")
+
+    final = _efectivo(general)
+    variacion = total_entra - total_sale
+    partes += [
+        "",
+        f"Al cierre quedan **{simbolo} {_n(final)}** entre caja y banco.",
+    ]
+    if inicial:
+        neto = variacion - inicial
+        signo = "más" if neto >= 0 else "menos"
+        partes.append(
+            f"\nDescontando el saldo inicial de {simbolo} {_n(inicial)}, en el período entró "
+            f"{simbolo} {_n(total_entra - inicial)} y salió {simbolo} {_n(total_sale)}: "
+            f"**{simbolo} {_n(abs(neto))} {signo}** que al empezar."
+        )
+        if estado.utilidad_neta > 0 and neto < 0:
+            partes.append(
+                f"\nFíjate en esto: la empresa **ganó {simbolo} {_n(estado.utilidad_neta)}** "
+                f"y sin embargo tiene menos dinero que antes. **Ganancia y caja no son lo "
+                f"mismo**: parte del dinero se fue a comprar mercadería que aún no se vende, "
+                f"parte de la venta todavía está por cobrar, y pagar deudas reduce la caja "
+                f"sin ser un gasto."
+            )
     return "\n".join(partes)
 
 
@@ -985,6 +1100,18 @@ Cobras dos letras de 70,800 cada una:
 | 104 | Letras por Cobrar | 0.00 | 141,600.00 |
 
 El patrimonio no se mueve: cambiaste un activo por otro.""",
+    ),
+    Ficha(
+        clave="flujo",
+        titulo="Cómo se movió el dinero",
+        frases=[
+            "flujo de efectivo", "flujo de caja", "como se movio el dinero",
+            "movimientos de dinero", "en que se gasto", "a donde se fue la plata",
+            "entradas y salidas", "por que tengo menos plata", "cash flow",
+            "de donde salio el dinero", "movimientos de caja",
+        ],
+        palabras=["flujo", "movio", "movimientos", "entradas", "salidas", "gasto"],
+        vivo=_flujo_de_efectivo,
     ),
     Ficha(
         clave="conclusiones",
