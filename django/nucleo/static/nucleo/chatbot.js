@@ -12,6 +12,7 @@
   var TOPE_GUARDADO = 40;
 
   var SUGERENCIAS = [
+    'Conclusiones del caso',
     'Resolver un enunciado',
     'Abre el caso...',
     '¿Cómo está mi caso?',

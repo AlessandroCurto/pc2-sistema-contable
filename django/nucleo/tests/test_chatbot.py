@@ -5,6 +5,7 @@ No llaman a la API: la respuesta del modelo se reemplaza por una falsa.
 
 import json
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.utils import timezone
@@ -721,3 +722,81 @@ class MuchasFormasDePreguntarTest(TestCase):
         for pregunta in ("de la", "que es", "para el"):
             with self.subTest(pregunta=pregunta):
                 self.assertIn("No estoy seguro", asistente.responder(pregunta, self.dominio))
+
+
+class ConclusionesDelCasoTest(TestCase):
+    """«Dime las conclusiones» no es solo repetir cifras: hay que interpretarlas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR)
+        cls.dominio = cls.caso.a_dominio()
+
+    def test_la_reconoce_de_varias_formas(self):
+        for pregunta in ("dime las conclusiones de comercializadora del sur s.a.c",
+                         "conclusiones", "analiza el caso", "que opinas",
+                         "interpretacion de resultados", "como le fue a la empresa",
+                         "dame un analisis financiero", "que concluyes"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIn("Conclusiones", asistente.responder(pregunta, self.dominio))
+
+    def test_trae_los_ratios_calculados(self):
+        respuesta = asistente.responder("conclusiones", self.dominio)
+        self.assertIn("100,746.17", respuesta)   # utilidad neta
+        self.assertIn("25.2%", respuesta)        # margen neto
+        self.assertIn("60.7%", respuesta)        # margen bruto
+        self.assertIn("5.86", respuesta)         # razón corriente
+        self.assertIn("17.1%", respuesta)        # endeudamiento
+        self.assertIn("80,542.37", respuesta)    # crédito de IGV
+
+    def test_distingue_ganancia_de_perdida(self):
+        self.assertIn("ganó", asistente.responder("conclusiones", self.dominio))
+        # Un gasto enorme deja el período en pérdida.
+        asiento = self.caso.asientos.order_by("numero").last()
+        linea = asiento.lineas.filter(debe__gt=0).first()
+        linea.debe = linea.debe + Decimal("900000")
+        linea.save()
+        otra = asiento.lineas.filter(haber__gt=0).first()
+        otra.haber = otra.haber + Decimal("900000")
+        otra.save()
+        respuesta = asistente.responder("conclusiones", self.caso.a_dominio())
+        self.assertIn("perdió", respuesta)
+        self.assertIn("no hay impuesto", respuesta)
+
+    def test_sin_caso_pide_abrir_uno(self):
+        self.assertIn("ningún caso abierto", asistente.responder("conclusiones", None))
+
+
+class CalculadoraTest(TestCase):
+    """«1+1?» es una pregunta legítima y antes no se entendía."""
+
+    def test_resuelve_operaciones(self):
+        esperados = {
+            "1+1?": "2", "cuanto es 2+2": "4", "5*4": "20", "(100+20)/2": "60",
+            "10-3": "7", "2+2*3": "8", "calcula 7*8": "56",
+        }
+        for pregunta, resultado in esperados.items():
+            with self.subTest(pregunta=pregunta):
+                self.assertIn(resultado, asistente.responder(pregunta, None))
+
+    def test_acepta_la_coma_de_miles_y_la_x(self):
+        self.assertIn("3", asistente.responder("1,000 + 2,500", None))
+        self.assertIn("472", asistente.responder("400000 x 1.18", None))
+
+    def test_redondea_a_dos_decimales(self):
+        self.assertIn("333.33", asistente.responder("1000/3", None))
+
+    def test_avisa_si_no_puede(self):
+        self.assertIn("No pude resolver", asistente.responder("1/0", None))
+
+    def test_no_evalua_nada_que_no_sea_aritmetica(self):
+        for intento in ("__import__('os')", "1+1; print(2)", "open('x')", "2**9999999"):
+            with self.subTest(intento=intento):
+                self.assertIsNone(asistente.calcular(intento))
+
+    def test_no_secuestra_las_preguntas_contables(self):
+        """«el IGV de 1,000,000» tiene números pero no es una cuenta suelta."""
+        for pregunta in ("cuanto es el igv de 1,000,000 incluido", "cual es mi utilidad neta",
+                         "que tasa usas", "como esta mi caso"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIsNone(asistente.expresion_aritmetica(pregunta))

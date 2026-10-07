@@ -27,6 +27,7 @@ from ..dominio.tipos import Caso as CasoDominio
 from . import enunciados
 
 IGV = Decimal("0.18")
+CENTIMO = Decimal("0.01")
 
 
 # --------------------------------------------------------------- utilidades
@@ -357,6 +358,111 @@ def _responder_cifra(indice: int, caso: Optional[CasoDominio]) -> str:
         "\nSi lo que querías era la explicación y no el número, pregúntame "
         "*cómo se calcula* eso mismo."
     )
+    return "\n".join(partes)
+
+
+def _por_ciento(parte: Decimal, total: Decimal) -> Optional[Decimal]:
+    if total == 0:
+        return None
+    return (parte / total * 100).quantize(Decimal("0.1"))
+
+
+def _conclusiones(caso: Optional[CasoDominio]) -> str:
+    """Lee el caso y dice qué significan sus cifras, no solo cuáles son."""
+    if caso is None:
+        return SIN_CASO
+    simbolo = caso.empresa.simbolo_moneda
+    estado = construir_estado_resultados(caso)
+    general = construir_balance_general(caso)
+    balance = construir_balance_comprobacion(caso)
+    if not caso.asientos:
+        return "El caso no tiene asientos todavía, así que no hay nada que concluir."
+
+    partes = [f"## Conclusiones — {caso.empresa.nombre}", ""]
+
+    # --- resultado del período
+    bruto = _por_ciento(estado.utilidad_bruta, estado.ventas_netas)
+    neto = _por_ciento(estado.utilidad_neta, estado.ventas_netas)
+    partes.append("### Resultado del período")
+    if estado.ventas_netas == 0:
+        partes.append("No hubo ventas en el período, así que no hay margen que medir.")
+    elif estado.utilidad_neta > 0:
+        partes.append(
+            f"La empresa **ganó {simbolo} {_n(estado.utilidad_neta)}** sobre ventas de "
+            f"{simbolo} {_n(estado.ventas_netas)}: un **margen neto del {neto}%**. "
+            f"De cada 100 soles vendidos le quedaron {neto} después de costos, gastos e "
+            f"impuesto."
+        )
+        partes.append(
+            f"\nEl margen bruto fue del **{bruto}%**, o sea que la mercadería se vendió a "
+            f"{bruto} por ciento por encima de lo que costó. Entre ese margen y el neto se "
+            f"fueron los gastos ({simbolo} {_n(estado.total_gastos - estado.costo_ventas)}) "
+            f"y el impuesto a la renta ({simbolo} {_n(estado.impuesto)})."
+        )
+    else:
+        partes.append(
+            f"La empresa **perdió {simbolo} {_n(abs(estado.utilidad_neta))}** en el período. "
+            f"Las ventas fueron {simbolo} {_n(estado.ventas_netas)} y no alcanzaron a cubrir "
+            f"el costo de ventas más los gastos. Por eso no hay impuesto a la renta: solo se "
+            f"paga sobre utilidad positiva."
+        )
+
+    # --- situación financiera
+    partes += ["", "### Situación financiera"]
+    corriente = general.activo_corriente.total
+    deuda_corta = general.pasivo_corriente.total
+    if deuda_corta > 0:
+        razon = (corriente / deuda_corta).quantize(Decimal("0.01"))
+        if razon >= Decimal("2"):
+            juicio = "holgada: puede pagar sus deudas de corto plazo sin apuros"
+        elif razon >= Decimal("1"):
+            juicio = "ajustada pero suficiente: cubre sus deudas de corto plazo"
+        else:
+            juicio = "**insuficiente**: sus deudas de corto plazo superan a su activo corriente"
+        partes.append(
+            f"Por cada sol que debe a corto plazo tiene **{simbolo} {razon}** de activo "
+            f"corriente. Es una posición {juicio}."
+        )
+    endeudamiento = _por_ciento(general.total_pasivo, general.total_activo)
+    if endeudamiento is not None:
+        propio = (Decimal("100") - endeudamiento).quantize(Decimal("0.1"))
+        partes.append(
+            f"\nEl **{endeudamiento}% del activo está financiado con deuda** y el {propio}% "
+            + ("con capital propio. Es una estructura poco apalancada."
+               if endeudamiento < 50 else
+               "con capital propio. La empresa depende bastante de terceros.")
+        )
+
+    # --- IGV, si lo hay
+    credito = next((d.monto for d in general.activo_corriente.cuentas
+                    if "credito" in normalizar(d.cuenta.nombre)), Decimal("0"))
+    debito = next((d.monto for d in general.pasivo_corriente.cuentas
+                   if "debito" in normalizar(d.cuenta.nombre)), Decimal("0"))
+    if credito or debito:
+        partes += ["", "### IGV"]
+        saldo = credito - debito
+        if saldo > 0:
+            partes.append(
+                f"El IGV de las compras ({simbolo} {_n(credito)}) supera al de las ventas "
+                f"({simbolo} {_n(debito)}): queda un **crédito de {simbolo} {_n(saldo)} a "
+                f"favor**, que se arrastra al mes siguiente. No hay nada que pagar a SUNAT."
+            )
+        elif saldo < 0:
+            partes.append(
+                f"El IGV de las ventas ({simbolo} {_n(debito)}) supera al de las compras "
+                f"({simbolo} {_n(credito)}): hay **{simbolo} {_n(-saldo)} por pagar a SUNAT**."
+            )
+
+    # --- control
+    partes += ["", "### Control"]
+    if balance.cuadrado and general.cuadrado:
+        partes.append(
+            f"Los {len(caso.asientos)} asientos cuadran, el Balance de Comprobación cierra en "
+            f"{simbolo} {_n(balance.total_debe)} de los dos lados y se cumple la ecuación "
+            f"contable. **La información es consistente.**"
+        )
+    else:
+        partes.append("**Hay un descuadre.** Pregúntame *por qué no cuadra* y te digo dónde.")
     return "\n".join(partes)
 
 
@@ -881,6 +987,19 @@ Cobras dos letras de 70,800 cada una:
 El patrimonio no se mueve: cambiaste un activo por otro.""",
     ),
     Ficha(
+        clave="conclusiones",
+        titulo="Conclusiones del caso",
+        frases=[
+            "conclusiones", "conclusion", "analiza el caso", "analisis del caso", "analizame",
+            "interpreta", "interpretacion", "que opinas", "como le fue", "como le fue a la",
+            "resumen ejecutivo", "que concluyes", "dame conclusiones", "analisis financiero",
+            "que significan los resultados", "interpretacion de resultados",
+        ],
+        palabras=["conclusiones", "conclusion", "analisis", "analiza", "interpreta",
+                  "interpretacion", "opinas", "concluyes"],
+        vivo=_conclusiones,
+    ),
+    Ficha(
         clave="parametros",
         titulo="Las tasas que uso",
         frases=[
@@ -1065,6 +1184,10 @@ def responder(pregunta: str, caso: Optional[CasoDominio] = None) -> str:
         return enunciados.resolver(pregunta, caso)
 
     # "¿cuál es mi utilidad neta?" pide un número suyo, no una ficha de teoría.
+    operacion = expresion_aritmetica(pregunta)
+    if operacion is not None:
+        return _responder_cuenta(operacion)
+
     indice = cifra_pedida(pregunta)
     if indice is not None:
         if caso is not None:
@@ -1140,3 +1263,88 @@ def caso_pedido(pregunta: str) -> Optional[str]:
 
     nombre = despues.group(1).strip(" \"'«»")
     return None if nombre in _NO_ES_NOMBRE else (nombre or None)
+
+
+# ------------------------------------------------------------- aritmética
+
+#: Solo dígitos, signos y paréntesis: nada que se parezca a código.
+SOLO_CUENTAS = re.compile(r"^[\d\s+\-*/().,x×÷]+$")
+OPERACION = re.compile(r"\d\s*[-+*/x×÷]\s*[\d(]")
+
+#: Palabras que indican que no es una cuenta suelta sino una pregunta contable.
+NO_ES_CUENTA = ("igv", "impuesto", "utilidad", "renta", "asiento", "cuenta", "saldo")
+
+
+def expresion_aritmetica(pregunta: str) -> Optional[str]:
+    """La operación que pide calcular, si la pregunta es solo eso.
+
+    Se trabaja sobre el texto crudo: normalizar() borra «+», «*» y los
+    paréntesis, que aquí son justamente lo que hay que conservar.
+    """
+    plano = unicodedata.normalize("NFD", pregunta.lower())
+    limpia = "".join(c for c in plano if unicodedata.category(c) != "Mn")
+    limpia = limpia.strip().rstrip("?!=. ")
+    for arranque in ("cuanto es", "cuanto hace", "cuanto da", "calcula", "resuelve", "dime"):
+        if limpia.startswith(arranque):
+            limpia = limpia[len(arranque):].strip()
+    if any(palabra in limpia for palabra in NO_ES_CUENTA):
+        return None
+    if not limpia or not SOLO_CUENTAS.match(limpia) or not OPERACION.search(limpia):
+        return None
+    return limpia
+
+
+def calcular(expresion: str) -> Optional[Decimal]:
+    """Resuelve la operación con decimales exactos. None si no se puede."""
+    import ast
+
+    texto = expresion.replace("x", "*").replace("×", "*").replace("÷", "/")
+    # 1,000.50 -> 1000.50; la coma aquí solo separa miles.
+    texto = re.sub(r"(?<=\d),(?=\d{3}\b)", "", texto)
+
+    permitidos = (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
+                  ast.Add, ast.Sub, ast.Mult, ast.Div, ast.USub, ast.UAdd)
+
+    def resolver(nodo):
+        if isinstance(nodo, ast.Expression):
+            return resolver(nodo.body)
+        if isinstance(nodo, ast.Constant):
+            if isinstance(nodo.value, bool) or not isinstance(nodo.value, (int, float)):
+                raise ValueError
+            return Decimal(str(nodo.value))
+        if isinstance(nodo, ast.UnaryOp):
+            valor = resolver(nodo.operand)
+            return -valor if isinstance(nodo.op, ast.USub) else valor
+        if isinstance(nodo, ast.BinOp):
+            izq, der = resolver(nodo.left), resolver(nodo.right)
+            if isinstance(nodo.op, ast.Add):
+                return izq + der
+            if isinstance(nodo.op, ast.Sub):
+                return izq - der
+            if isinstance(nodo.op, ast.Mult):
+                return izq * der
+            if isinstance(nodo.op, ast.Div):
+                if der == 0:
+                    raise ZeroDivisionError
+                return izq / der
+        raise ValueError
+
+    try:
+        arbol = ast.parse(texto, mode="eval")
+        for nodo in ast.walk(arbol):
+            if not isinstance(nodo, permitidos):
+                return None
+        resultado = resolver(arbol)
+    except (SyntaxError, ValueError, ZeroDivisionError, TypeError, ArithmeticError):
+        return None
+    return resultado.quantize(CENTIMO) if resultado % 1 else resultado.quantize(Decimal("1"))
+
+
+def _responder_cuenta(expresion: str) -> str:
+    resultado = calcular(expresion)
+    if resultado is None:
+        return (
+            f"No pude resolver «{expresion}». Puedo con sumas, restas, "
+            "multiplicaciones y divisiones, por ejemplo `1+1` o `(400000*1.18)/2`."
+        )
+    return f"`{expresion}` = **{resultado:,}**".replace(",", " ")
