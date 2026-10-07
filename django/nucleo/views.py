@@ -8,10 +8,11 @@ calculó, igual que los componentes de la versión en React.
 from __future__ import annotations
 
 import json
+import time
 
 from django.contrib import messages
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -39,6 +40,7 @@ from .forms import (
 )
 from .models import Asiento, Caso, Cuenta
 from .navegacion import accesos_rapidos
+from .servicios import chatbot as chatbot_servicio
 from .servicios import excel as servicio_excel
 from .servicios.casos import (
     exportar_json,
@@ -526,24 +528,90 @@ def configuracion(request):
     )
 
 
-# ----------------------------------------------------------- chatbot
+# ----------------------------------------------------------------- asistente
 
-from django.views.decorators.csrf import csrf_exempt
+#: Tope por sesión y por hora. El sitio es público y cada pregunta cuesta.
+CHAT_TOPE = 40
+CHAT_VENTANA = 3600
+CHAT_MAX_CARACTERES = 4000
+CHAT_MAX_MENSAJES = 20
 
-@csrf_exempt
+
+def _limite_alcanzado(request) -> bool:
+    """Cuenta las preguntas de esta sesión dentro de la ventana de una hora."""
+    ahora = time.time()
+    inicio = request.session.get("chat_ventana", 0)
+    usos = request.session.get("chat_usos", 0)
+    if ahora - inicio > CHAT_VENTANA:
+        inicio, usos = ahora, 0
+    if usos >= CHAT_TOPE:
+        return True
+    request.session["chat_ventana"] = inicio
+    request.session["chat_usos"] = usos + 1
+    return False
+
+
+def _mensajes_validos(crudos):
+    """Deja solo lo que la API acepta: roles correctos y texto no vacío."""
+    if not isinstance(crudos, list) or not crudos:
+        return None
+    limpios = []
+    for item in crudos[-CHAT_MAX_MENSAJES:]:
+        if not isinstance(item, dict):
+            return None
+        rol = item.get("role")
+        texto = item.get("content")
+        if rol not in ("user", "assistant") or not isinstance(texto, str):
+            return None
+        texto = texto.strip()[:CHAT_MAX_CARACTERES]
+        if texto:
+            limpios.append({"role": rol, "content": texto})
+    # La API exige que el primero y el último sean del usuario.
+    while limpios and limpios[0]["role"] != "user":
+        limpios.pop(0)
+    if not limpios or limpios[-1]["role"] != "user":
+        return None
+    return limpios
+
+
+def _evento(**datos) -> str:
+    return "data: " + json.dumps(datos, ensure_ascii=False) + "\n\n"
+
+
 @require_POST
 def chatbot(request):
-    """Endpoint AJAX para el chatbot de asistencia."""
+    """Responde en vivo: cada pedazo de texto sale apenas el modelo lo produce."""
     try:
-        datos = json.loads(request.body)
-        mensajes = datos.get("mensajes", [])
-        if not mensajes or not isinstance(mensajes, list):
-            return JsonResponse({"error": "mensajes requerido"}, status=400)
-        # Limitar historial a últimas 20 interacciones para no exceder tokens
-        mensajes = mensajes[-20:]
-    except (json.JSONDecodeError, KeyError):
-        return JsonResponse({"error": "JSON inválido"}, status=400)
+        cuerpo = json.loads(request.body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "No se pudo leer la pregunta."}, status=400)
 
-    from .servicios.chatbot import chatear
-    respuesta = chatear(mensajes)
-    return JsonResponse({"respuesta": respuesta})
+    mensajes = _mensajes_validos(cuerpo.get("mensajes"))
+    if mensajes is None:
+        return JsonResponse({"error": "La conversación llegó incompleta."}, status=400)
+
+    if _limite_alcanzado(request):
+        return JsonResponse(
+            {"error": "Llegaste al límite de preguntas por hora. Vuelve a intentarlo más tarde."},
+            status=429,
+        )
+
+    caso = caso_activo(request)
+    dominio = caso.a_dominio() if caso is not None else None
+
+    def flujo():
+        try:
+            for pedazo in chatbot_servicio.responder_en_vivo(mensajes, dominio):
+                yield _evento(t=pedazo)
+        except chatbot_servicio.ChatbotNoConfigurado as error:
+            yield _evento(error=str(error))
+        except Exception:
+            yield _evento(
+                error="El asistente no está disponible en este momento. Inténtalo de nuevo."
+            )
+        yield _evento(fin=True)
+
+    respuesta = StreamingHttpResponse(flujo(), content_type="text/event-stream")
+    respuesta["Cache-Control"] = "no-cache"
+    respuesta["X-Accel-Buffering"] = "no"  # que el proxy de Render no lo retenga
+    return respuesta

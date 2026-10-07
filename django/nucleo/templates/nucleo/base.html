@@ -138,6 +138,14 @@
       Sistema y Gestión Financiera · Django + PostgreSQL
     </footer>
 
+    {# El asistente lee de aqui el token CSRF y que caso esta abierto. #}
+    <span
+      id="chat-datos"
+      hidden
+      data-csrf="{{ csrf_token }}"
+      data-caso="{% if caso_activo %}{{ caso_activo.nombre }}{% endif %}"
+    ></span>
+
     {% block scripts %}{% endblock %}
   </body>
 </html>

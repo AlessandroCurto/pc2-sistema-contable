@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 47 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 70 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -76,10 +76,35 @@ de 0.1 + 0.2 dan exactamente 0.30.
 | pandas | `servicios/excel.py` | exportar los reportes a Excel e importar asientos de un .xlsx o .csv |
 | openpyxl | con pandas | es el motor que escribe y lee los .xlsx |
 | WhiteNoise | `settings.py` | sirve el CSS y los iconos sin nginx, para que el despliegue sea directo |
+| Anthropic | `servicios/chatbot.py` | el asistente que responde dentro de la aplicación |
 
 El PDF reemplaza a jsPDF y el Excel es nuevo: en el navegador no tenía sentido,
 pero con Python una hoja de cálculo sale casi gratis y el profesor suele pedir
 los cuadros en Excel.
+
+## El asistente
+
+Abajo a la derecha hay un botón con un robot que abre una conversación. Sirve para
+tres cosas: resolver un enunciado paso a paso, explicar la teoría y guiar por las
+pantallas del sistema.
+
+Lo que lo hace útil no es el modelo sino lo que ve: en cada pregunta se le adjunta
+**el caso que está abierto** —su plan de cuentas, sus asientos y las cifras que el
+motor contable ya calculó—, así responde sobre los números que están en pantalla y
+no en abstracto. El contexto lo arma `_contexto_del_caso()` en
+`servicios/chatbot.py`.
+
+La respuesta se escribe mientras llega (Server-Sent Events), no de golpe al final.
+
+Para que funcione hay que poner la variable `ANTHROPIC_API_KEY` en el panel de
+Render, igual que `DATABASE_URL`: **nunca en el repositorio**. Sin ella, el
+asistente abre y lo dice con un aviso en vez de fallar. La clave se saca de
+console.anthropic.com. El modelo se puede cambiar con `CHATBOT_MODELO`
+(por defecto `claude-sonnet-5-5`).
+
+Límites puestos a propósito, porque el sitio es público y cada pregunta cuesta:
+40 preguntas por hora y por sesión, 20 mensajes de historial y 4 000 caracteres
+por mensaje.
 
 ## Reglas del sistema que no cambiaron
 
