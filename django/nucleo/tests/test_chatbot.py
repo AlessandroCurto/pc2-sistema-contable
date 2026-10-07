@@ -645,3 +645,79 @@ class PreguntasSobreElSistemaTest(TestCase):
         for pregunta, numero in cifra.items():
             with self.subTest(pregunta=pregunta):
                 self.assertIn(numero, asistente.responder(pregunta, self.dominio))
+
+
+class MuchasFormasDePreguntarTest(TestCase):
+    """No hay que acertar la frase exacta: «qué IGV trabajas» vale igual que
+    «con qué IGV trabajas». Esta batería cubre las formas que se usan de verdad."""
+
+    FORMAS = {
+        "Las tasas que uso": [
+            "que igv trabajas", "que igv usas", "con que igv", "igv que usas", "que tasa",
+            "tasa que usas", "cual tasa manejas", "con que porcentaje trabajas",
+            "que impuesto aplicas", "cuantos decimales", "como redondeas", "que tasas tienes",
+        ],
+        "Cómo funciona": [
+            "como funciona", "como trabaja la pagina", "que hace el sistema",
+            "como se usa esto", "explicame el sistema",
+        ],
+        "Registrar un asiento": [
+            "registrar asiento", "como registro", "quiero anotar un asiento",
+            "crear asiento", "nuevo asiento", "el registro de asientos",
+        ],
+        "Importar asientos": [
+            "importar excel", "subir excel", "excel", "importacion de asientos",
+            "cargar desde csv", "plantilla de excel",
+        ],
+        "El IGV": [
+            "como se calcula el igv", "calcular igv", "el igv incluido",
+            "igv credito fiscal", "sacar el igv",
+        ],
+        "Costo de ventas": [
+            "costo de ventas", "diferencia de inventarios", "existencia final",
+            "calcular el costo", "como saco el costo de ventas",
+        ],
+        "Letras de cambio": [
+            "letras de cambio", "la letra", "que son las letras", "letras por cobrar",
+        ],
+        "Plan de Cuentas": [
+            "plan de cuentas", "agregar cuenta", "crear una cuenta", "eliminar cuenta",
+            "las cuentas",
+        ],
+        "Descargas": ["descargar pdf", "generar pdf", "exportar a excel", "imprimir"],
+        "Debe y qué al Haber": [
+            "que va al debe", "debe o haber", "naturaleza de las cuentas", "cuando va al haber",
+        ],
+        "partida doble": ["partida doble", "la doble partida", "por que debe igual haber"],
+        "ciclo contable": ["ciclo contable", "pasos para resolver", "por donde empiezo"],
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.dominio = crear_caso_demo(COMERCIALIZADORA_SUR).a_dominio()
+
+    def test_todas_las_formas_llegan_a_su_ficha(self):
+        for esperado, preguntas in self.FORMAS.items():
+            for pregunta in preguntas:
+                with self.subTest(pregunta=pregunta):
+                    primera = asistente.responder(pregunta, self.dominio).split("\n")[0]
+                    self.assertIn(esperado.lower(), primera.lower())
+
+    def test_una_sola_palabra_tambien_sirve(self):
+        """«excel» o «las cuentas» son preguntas claras aunque sean cortas."""
+        for pregunta in ("excel", "la letra", "las cuentas", "que tasa", "imprimir"):
+            with self.subTest(pregunta=pregunta):
+                respuesta = asistente.responder(pregunta, self.dominio)
+                self.assertNotIn("No estoy seguro", respuesta)
+
+    def test_sigue_rechazando_lo_que_no_sabe(self):
+        for pregunta in ("cual es la capital de francia", "quien gano el mundial",
+                         "receta de ceviche", "el clima de hoy", "futbol", "una cancion"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIn("No estoy seguro", asistente.responder(pregunta, self.dominio))
+
+    def test_las_palabras_vacias_no_deciden(self):
+        """«de», «que» o «la» no pueden hacer que una ficha gane."""
+        for pregunta in ("de la", "que es", "para el"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIn("No estoy seguro", asistente.responder(pregunta, self.dominio))

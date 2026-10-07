@@ -956,6 +956,27 @@ También hago cuentas: *«cuánto es el IGV de 1,000,000 incluido»*.""",
 UMBRAL = 2.0
 
 
+def _elegir_ficha(limpia: str):
+    """La mejor ficha para la pregunta, o None si ninguna convence.
+
+    Pedir siempre dos aciertos dejaba fuera las preguntas de una palabra
+    («excel», «las cuentas»), que son de las más claras que hay. Si la
+    pregunta es corta basta un acierto, siempre que una ficha gane sola.
+    """
+    puntuadas = sorted(
+        ((_puntaje(f, limpia), f) for f in FICHAS), key=lambda par: par[0], reverse=True
+    )
+    mejor, ficha = puntuadas[0]
+    if mejor >= UMBRAL:
+        return ficha, puntuadas
+    # Con una o dos palabras, un solo acierto basta. Si dos fichas empatan,
+    # cualquiera de las dos responde algo razonable: es mejor que no entender.
+    con_contenido = [p for p in limpia.split() if p not in VACIAS]
+    if len(con_contenido) <= 2 and mejor >= 1.0:
+        return ficha, puntuadas
+    return None, puntuadas
+
+
 def misma_raiz(una: str, otra: str) -> bool:
     """¿Son la misma palabra en otra forma?
 
@@ -971,17 +992,59 @@ def misma_raiz(una: str, otra: str) -> bool:
     return len(corto) >= 5 and corto[:5] == largo[:5]
 
 
+#: Palabras que no dicen nada del tema. Se descartan para que lo que decida
+#: sean las palabras con contenido y no el largo de la pregunta.
+VACIAS = frozenset("""
+a al algo alguna alguno ahora aqui asi aun cada como con cosa cual cuales cuando
+cuanta cuantas cuanto cuantos de del donde dos e el ella ellas ello ellos en entre
+era eran eres es esa esas ese eso esos esta estan estas este esto estos ha hace
+hacer hacia hay la las le les lo los me mi mis mucho muy nos o os otra otro para
+pero poder por porque que quien se sea ser si sin sobre son su sus tambien te
+tendria tener tengo ti tiene tienen tu tus un una uno unos ver y ya yo
+""".split())
+
+
+def _vocabulario(ficha: Ficha) -> Dict[str, float]:
+    """Las palabras con contenido de la ficha, con su peso.
+
+    Las frases no sirven solo como coincidencia exacta: sus palabras cuentan
+    por separado. Así «¿qué IGV trabajas?» llega aunque la frase escrita sea
+    «con qué IGV trabajas», sin tener que anticipar cada forma de preguntarlo.
+    Una palabra que viene de una frase pesa más: alguien se tomó el trabajo de
+    escribirla dentro de una pregunta entera, no sueltas por si acaso.
+    """
+    pesos: Dict[str, float] = {palabra: 1.0 for palabra in ficha.palabras}
+    for frase in ficha.frases:
+        for palabra in frase.split():
+            if palabra not in VACIAS:
+                # Cuantas más veces la ficha use la palabra, más es su tema:
+                # "excel" está en cinco frases de Importar y en dos de Descargas.
+                pesos[palabra] = min(2.4, max(pesos.get(palabra, 0), 1.2) + 0.2)
+    return pesos
+
+
+#: Se arma una vez al cargar el módulo, no en cada pregunta.
+VOCABULARIOS: Dict[str, Dict[str, float]] = {}
+
+
 def _puntaje(ficha: Ficha, pregunta: str) -> float:
     puntos = 0.0
     for frase in ficha.frases:
         if frase in pregunta:
-            # Una frase larga que calza es mucha más señal que una palabra suelta.
+            # Una frase entera que calza es mucha más señal que una palabra suelta.
             puntos += 4.0 + len(frase) / 20
-    palabras = pregunta.split()
-    for palabra in ficha.palabras:
-        if any(misma_raiz(palabra, suya) for suya in palabras):
-            puntos += 1.0
+    vocabulario = VOCABULARIOS[ficha.clave]
+    for palabra in pregunta.split():
+        if palabra in VACIAS:
+            continue
+        pesos = [peso for conocida, peso in vocabulario.items()
+                 if misma_raiz(palabra, conocida)]
+        if pesos:
+            puntos += max(pesos)
     return puntos
+
+
+VOCABULARIOS.update({ficha.clave: _vocabulario(ficha) for ficha in FICHAS})
 
 
 def hay_enunciado(pregunta: str, caso: Optional[CasoDominio]) -> bool:
@@ -1011,18 +1074,15 @@ def responder(pregunta: str, caso: Optional[CasoDominio] = None) -> str:
         if re.search(r"\b(mi|mis|tengo|gane|gano|ganamos|vendi|vendimos)\b", limpia):
             return SIN_CASO
 
-    puntuadas = sorted(
-        ((_puntaje(f, limpia), f) for f in FICHAS), key=lambda par: par[0], reverse=True
-    )
-    mejor, ficha = puntuadas[0]
+    ficha, puntuadas = _elegir_ficha(limpia)
 
     # "cuanto es el igv de 1,000,000" -> hace la cuenta con ese número.
-    if ficha.clave in ("igv-teoria", "mi-igv") and _numeros(limpia):
+    if ficha is not None and ficha.clave in ("igv-teoria", "mi-igv") and _numeros(limpia):
         cuenta = _calcular_igv(caso, limpia)
         if cuenta:
             return cuenta
 
-    if mejor < UMBRAL:
+    if ficha is None:
         cercanas = [f.titulo for _, f in puntuadas[1:4]]
         return "\n".join([
             "No estoy seguro de haber entendido. Puedo responderte sobre:",
@@ -1046,7 +1106,9 @@ def fue_entendida(pregunta: str) -> bool:
         return False
     if enunciados.parece_enunciado(pregunta):
         return True
-    return max((_puntaje(f, limpia) for f in FICHAS), default=0.0) >= UMBRAL
+    if cifra_pedida(pregunta) is not None or caso_pedido(pregunta) is not None:
+        return True
+    return _elegir_ficha(limpia)[0] is not None
 
 
 # ------------------------------------------------------- abrir otro caso

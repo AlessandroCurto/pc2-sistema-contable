@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 166 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 170 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -114,8 +114,12 @@ servidor (`servicios/asistente.py`). Hace tres cosas:
    renta, costo de ventas, letras y el ciclo contable. También hace la cuenta si le pasas
    un monto («cuánto es el IGV de 1,000,000 incluido»).
 
-Las preguntas no hace falta escribirlas con las palabras exactas de la ficha: se comparan
-los comienzos, así que «calculas», «cálculo» y «calcular» llegan al mismo sitio. Y «mi»
+No hace falta acertar la frase exacta. Las frases de cada ficha no son solo una
+coincidencia literal: sus palabras también cuentan por separado y pesan más cuanto más
+las usa esa ficha, así que «¿qué IGV trabajas?» llega aunque lo escrito sea «con qué IGV
+trabajas». Se comparan los comienzos de las palabras, de modo que «calculas», «cálculo» y
+«calcular» caen en el mismo sitio, y las palabras vacías («de», «que», «la») no deciden
+nada. Con una o dos palabras —«excel», «las cuentas»— basta un acierto. Y «mi»
 decide entre el método y la cifra: *calcular el costo de ventas* explica cómo, *mi costo de
 ventas* da el número.
 
