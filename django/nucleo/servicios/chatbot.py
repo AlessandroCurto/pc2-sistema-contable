@@ -17,6 +17,7 @@ from ..dominio.balance_general import construir_balance_general
 from ..dominio.cuentas import ETIQUETA_TIPO, ordenar_cuentas
 from ..dominio.estado_resultados import construir_estado_resultados
 from ..dominio.tipos import Caso as CasoDominio
+from . import asistente
 
 #: Tope de asientos que se mandan en detalle. Por encima, se resumen.
 MAX_ASIENTOS = 60
@@ -201,10 +202,38 @@ def _sistema(caso: Optional[CasoDominio]) -> List[Dict]:
     ]
 
 
+def hay_api() -> bool:
+    """¿Está puesta la clave? Sin ella el asistente funciona igual, pero local."""
+    return bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
+
+
 def responder_en_vivo(
     mensajes: List[Dict[str, str]], caso: Optional[CasoDominio] = None
 ) -> Iterator[str]:
-    """Devuelve la respuesta por pedazos, para escribirla en pantalla al vuelo."""
+    """Devuelve la respuesta por pedazos, para escribirla en pantalla al vuelo.
+
+    Primero contesta el asistente local, que no cuesta nada y para las preguntas
+    que conoce es más exacto (lee el caso y usa el motor contable). Solo si no
+    entendió la pregunta, y solo si hay clave de API, se consulta al modelo.
+    """
+    pregunta = mensajes[-1]["content"] if mensajes else ""
+    local = asistente.responder(pregunta, caso)
+
+    if not asistente.fue_entendida(pregunta) and hay_api():
+        try:
+            yield from _responder_con_api(mensajes, caso)
+            return
+        except Exception:
+            pass  # si la API falla, queda la respuesta local
+
+    # En trozos, para que la pantalla lo escriba como una conversación.
+    for parrafo in local.split("\n\n"):
+        yield parrafo + "\n\n"
+
+
+def _responder_con_api(
+    mensajes: List[Dict[str, str]], caso: Optional[CasoDominio]
+) -> Iterator[str]:
     cliente = _cliente()
     with cliente.messages.stream(
         model=MODELO,

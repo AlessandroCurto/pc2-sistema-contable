@@ -11,11 +11,12 @@
   var TOPE_GUARDADO = 40;
 
   var SUGERENCIAS = [
-    'Resuélveme el caso que tengo abierto',
+    '¿Cómo está mi caso?',
+    '¿Por qué no cuadra?',
     '¿Cómo registro un asiento?',
     '¿Cómo se calcula el IGV?',
-    '¿Por qué no cuadra mi balance?',
-    'Importar asientos desde Excel',
+    'Importar desde Excel',
+    '¿Qué va al Debe y qué al Haber?',
   ];
 
   var historial = [];
@@ -327,8 +328,8 @@
 
   function bienvenida(animar) {
     var div = pintar(
-      'Soy tu asistente contable. Puedo resolver el caso que tengas abierto, ' +
-        'explicarte la teoría y guiarte por el sistema. ¿Qué necesitas?',
+      'Soy tu asistente contable. Puedo revisar el caso que tienes abierto con sus ' +
+        'cifras reales, explicarte la teoría y guiarte por el sistema. ¿Qué necesitas?',
       'assistant',
       animar
     );

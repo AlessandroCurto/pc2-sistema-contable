@@ -10,6 +10,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from ..datos.casos_demo import COMERCIALIZADORA_SUR, CYBERTEC, crear_caso_demo
+from ..servicios import asistente
 from ..servicios import chatbot as servicio
 from ..views import _mensajes_validos
 
@@ -195,3 +196,126 @@ class PaginaConElAsistenteTest(TestCase):
         self.assertContains(respuesta, 'id="chat-datos"')
         self.assertContains(respuesta, "chatbot.js")
         self.assertContains(respuesta, "chatbot.css")
+
+
+class AsistenteLocalTest(TestCase):
+    """El asistente que responde sin API: fichas, revisiones en vivo y cuentas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR)
+
+    def _responder(self, pregunta, caso=True):
+        dominio = self.caso.a_dominio() if caso is True else caso
+        return asistente.responder(pregunta, dominio)
+
+    # ---- fichas de contenido
+
+    def test_responde_sobre_el_sistema(self):
+        self.assertIn("Registrar Asiento", self._responder("como registro un asiento"))
+        self.assertIn("plantilla", self._responder("como importo desde excel"))
+        self.assertIn("PDF", self._responder("como descargo el pdf"))
+
+    def test_responde_teoria(self):
+        self.assertIn("partida doble", self._responder("que es la partida doble").lower())
+        self.assertIn("Deudora", self._responder("que va al debe y que al haber"))
+        self.assertIn("847,457.63", self._responder("como se calcula el igv"))
+
+    def test_no_le_afectan_las_tildes_ni_las_mayusculas(self):
+        con = self._responder("¿CÓMO REGISTRO UN ASIENTO?")
+        sin = self._responder("como registro un asiento")
+        self.assertEqual(con, sin)
+
+    def test_cuando_no_entiende_lo_dice_y_no_inventa(self):
+        respuesta = self._responder("cual es la capital de francia")
+        self.assertIn("No estoy seguro", respuesta)
+
+    # ---- revisiones en vivo
+
+    def test_el_resumen_trae_las_cifras_reales(self):
+        respuesta = self._responder("como esta mi caso")
+        self.assertIn("Comercializadora del Sur S.A.C.", respuesta)
+        self.assertIn("100,746.17", respuesta)
+        self.assertIn("7,114,902.37", respuesta)
+
+    def test_dice_que_un_caso_sano_no_tiene_descuadres(self):
+        self.assertIn("no encontré ningún descuadre", self._responder("por que no cuadra"))
+
+    def test_senala_el_asiento_descuadrado(self):
+        asiento = self.caso.asientos.order_by("numero").first()
+        linea = asiento.lineas.first()
+        linea.debe = linea.debe + 500
+        linea.save()
+        respuesta = self._responder("por que no me cuadra")
+        self.assertIn("no cuadran", respuesta)
+        self.assertIn(str(asiento.numero), respuesta)
+        self.assertIn("500.00", respuesta)
+
+    def test_suma_el_igv_del_caso(self):
+        respuesta = self._responder("cuanto igv tengo")
+        self.assertIn("152,542.37", respuesta)   # crédito fiscal
+        self.assertIn("72,000.00", respuesta)    # débito fiscal
+        self.assertIn("80,542.37", respuesta)    # saldo a favor
+
+    def test_lista_los_asientos(self):
+        respuesta = self._responder("que asientos tengo")
+        self.assertIn("8 asientos", respuesta)
+        self.assertIn("Adelco", respuesta)
+
+    def test_sin_caso_pide_abrir_uno(self):
+        for pregunta in ("como esta mi caso", "por que no cuadra", "cuanto igv tengo"):
+            self.assertIn("ningún caso abierto", self._responder(pregunta, caso=None))
+
+    # ---- cuentas con el monto de la pregunta
+
+    def test_calcula_el_igv_incluido(self):
+        respuesta = self._responder("cuanto es el igv de 1,000,000 incluido")
+        self.assertIn("847,457.63", respuesta)
+        self.assertIn("152,542.37", respuesta)
+
+    def test_calcula_el_igv_sobre_la_base(self):
+        respuesta = self._responder("cuanto es el igv de 400000 mas igv")
+        self.assertIn("72,000.00", respuesta)
+        self.assertIn("472,000.00", respuesta)
+
+    # ---- enlace con la vista
+
+    def test_fue_entendida_distingue(self):
+        self.assertTrue(asistente.fue_entendida("como registro un asiento"))
+        self.assertFalse(asistente.fue_entendida("cual es la capital de francia"))
+        self.assertFalse(asistente.fue_entendida(""))
+
+
+class SinClaveDeApiTest(TestCase):
+    """Sin ANTHROPIC_API_KEY el asistente responde igual, con lo local."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(CYBERTEC)
+
+    def test_responde_sin_clave(self):
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}, clear=False):
+            respuesta = self.client.post(
+                reverse("chatbot"),
+                data=json.dumps(
+                    {"mensajes": [{"role": "user", "content": "como registro un asiento"}]}
+                ),
+                content_type="application/json",
+            )
+            cuerpo = b"".join(respuesta.streaming_content).decode("utf-8")
+        self.assertIn("Registrar Asiento", cuerpo)
+        self.assertNotIn("no está configurado", cuerpo)
+        self.assertIn('"fin": true', cuerpo)
+
+    def test_sin_clave_una_pregunta_rara_no_llama_a_la_api(self):
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}, clear=False):
+            with patch.object(servicio, "_responder_con_api") as api:
+                respuesta = self.client.post(
+                    reverse("chatbot"),
+                    data=json.dumps(
+                        {"mensajes": [{"role": "user", "content": "quien gano el mundial"}]}
+                    ),
+                    content_type="application/json",
+                )
+                b"".join(respuesta.streaming_content)
+            api.assert_not_called()

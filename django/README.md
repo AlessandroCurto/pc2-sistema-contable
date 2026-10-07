@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 70 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 85 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -84,27 +84,38 @@ los cuadros en Excel.
 
 ## El asistente
 
-Abajo a la derecha hay un botón con un robot que abre una conversación. Sirve para
-tres cosas: resolver un enunciado paso a paso, explicar la teoría y guiar por las
-pantallas del sistema.
+Abajo a la derecha hay un botón con un robot que abre una conversación.
+**Funciona sin conexión a ninguna API y sin costo**: las respuestas se arman en el
+servidor (`servicios/asistente.py`). Hace tres cosas:
 
-Lo que lo hace útil no es el modelo sino lo que ve: en cada pregunta se le adjunta
-**el caso que está abierto** —su plan de cuentas, sus asientos y las cifras que el
-motor contable ya calculó—, así responde sobre los números que están en pantalla y
-no en abstracto. El contexto lo arma `_contexto_del_caso()` en
-`servicios/chatbot.py`.
+1. **Revisa el caso abierto con sus cifras reales.** «¿Cómo está mi caso?» devuelve el
+   resumen con sus importes; «¿por qué no cuadra?» recorre los asientos y nombra el que
+   falla, con su diferencia. Aquí el asistente le gana a un modelo de lenguaje: no estima,
+   lee el caso y usa el mismo motor contable que las pantallas.
+2. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
+   descargas, configuración y los cinco reportes.
+3. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
+   renta, costo de ventas, letras y el ciclo contable. También hace la cuenta si le pasas
+   un monto («cuánto es el IGV de 1,000,000 incluido»).
 
-La respuesta se escribe mientras llega (Server-Sent Events), no de golpe al final.
+Cuando no reconoce la pregunta **lo dice** y ofrece los temas cercanos; nunca inventa una
+respuesta ni un botón que no existe.
 
-Para que funcione hay que poner la variable `ANTHROPIC_API_KEY` en el panel de
-Render, igual que `DATABASE_URL`: **nunca en el repositorio**. Sin ella, el
-asistente abre y lo dice con un aviso en vez de fallar. La clave se saca de
-console.anthropic.com. El modelo se puede cambiar con `CHATBOT_MODELO`
-(por defecto `claude-sonnet-5-5`).
+La respuesta se escribe mientras llega (Server-Sent Events), no de golpe al final, y la
+conversación sobrevive al cambio de pantalla.
 
-Límites puestos a propósito, porque el sitio es público y cada pregunta cuesta:
-40 preguntas por hora y por sesión, 20 mensajes de historial y 4 000 caracteres
-por mensaje.
+### Conectarlo a la API (opcional)
+
+Si algún día se pone la variable `ANTHROPIC_API_KEY` en el panel de Render, las preguntas
+que el asistente local **no reconoce** pasan al modelo (`servicios/chatbot.py`), que recibe
+el caso abierto como contexto. Las que sí reconoce se siguen respondiendo en el servidor,
+así que esa parte nunca cuesta. Si la API falla, queda la respuesta local. El modelo se
+elige con `CHATBOT_MODELO` (por omisión `claude-sonnet-5-5`).
+
+Sin esa variable no pasa nada: el asistente funciona completo.
+
+Límites de la vista, por si se activa la API: 40 preguntas por hora y por sesión,
+20 mensajes de historial y 4 000 caracteres por mensaje.
 
 ## Reglas del sistema que no cambiaron
 
