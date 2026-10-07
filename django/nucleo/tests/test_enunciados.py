@@ -197,13 +197,73 @@ class AsistenteConEnunciadoTest(TestCase):
     def setUpTestData(cls):
         cls.caso = crear_caso_demo(CYBERTEC)
 
-    def test_sin_caso_abierto_pide_abrir_uno(self):
+    def test_sin_caso_abierto_prepara_uno_con_el_nombre_del_enunciado(self):
         from ..servicios import asistente
         from ..models import Caso
 
         Caso.objects.all().delete()
         respuesta = asistente.responder(ENUNCIADO, None)
-        self.assertIn("necesito un caso", respuesta)
+        self.assertIn("Comercializadora del Sur S.A.C.", respuesta)
+        self.assertIn("847,457.63", respuesta)
+
+    def test_sin_caso_el_boton_crea_el_caso_entero(self):
+        from ..models import Caso
+
+        Caso.objects.all().delete()
+        respuesta = self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": ENUNCIADO}),
+            content_type="application/json",
+        )
+        datos = respuesta.json()
+        self.assertEqual(datos["guardados"], 8)
+        self.assertEqual(datos["caso"], "Comercializadora del Sur S.A.C.")
+        caso = Caso.objects.get()
+        self.assertEqual(caso.asientos.count(), 8)
+        self.assertEqual(caso.periodo_inicio.isoformat(), "2024-06-01")
+        self.assertEqual(caso.periodo_fin.isoformat(), "2024-06-30")
+        balance = construir_balance_comprobacion(caso.a_dominio())
+        self.assertTrue(balance.cuadrado)
+        self.assertEqual(balance.total_debe, Decimal("9170697.63"))
+
+    def test_completa_las_cuentas_que_le_faltan_al_plan(self):
+        """CYBERTEC usa el PCGE: no tiene letras ni cuentas de IGV."""
+        from ..models import Caso
+
+        Caso.objects.all().delete()
+        caso = crear_caso_demo(CYBERTEC)
+        caso.asientos.all().delete()
+        self.client.post(reverse("caso_abrir", args=[caso.pk]))
+        antes = caso.cuentas.count()
+        respuesta = self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": ENUNCIADO}),
+            content_type="application/json",
+        )
+        datos = respuesta.json()
+        self.assertEqual(datos["guardados"], 8)
+        self.assertGreater(datos["cuentas"], 0)
+        self.assertGreater(caso.cuentas.count(), antes)
+        self.assertTrue(caso.cuentas.filter(nombre="Letras por Cobrar").exists())
+        balance = construir_balance_comprobacion(caso.a_dominio())
+        self.assertTrue(balance.cuadrado)
+
+    def test_las_cuentas_nuevas_nacen_con_su_tipo_correcto(self):
+        from ..models import Caso
+
+        Caso.objects.all().delete()
+        self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": ENUNCIADO}),
+            content_type="application/json",
+        )
+        caso = Caso.objects.get()
+        tipos = {c.nombre: c.tipo for c in caso.cuentas.all()}
+        self.assertEqual(tipos["Letras por Pagar"], "PASIVO")
+        self.assertEqual(tipos["IGV Crédito Fiscal"], "ACTIVO")
+        self.assertEqual(tipos["Capital"], "PATRIMONIO")
+        self.assertEqual(tipos["Ventas"], "INGRESO")
+        self.assertEqual(tipos["Costo de Ventas"], "GASTO")
 
     def test_el_chat_ofrece_registrar(self):
         caso = crear_caso_demo(COMERCIALIZADORA_SUR)

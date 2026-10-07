@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 114 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 117 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -94,7 +94,9 @@ servidor (`servicios/asistente.py`). Hace tres cosas:
    falta: el valor de cada letra sale de la operación que las emitió, el *50% de la deuda*
    del saldo inicial de proveedores, y el costo de ventas de las compras que ya leyó. Un
    botón los registra en el caso, pasando por el mismo `importar_asientos()` que valida la
-   importación de Excel. La operación que no reconoce la informa en vez de inventarla, y
+   importación de Excel. No hace falta preparar nada antes: si al plan de cuentas le faltan
+   cuentas las agrega con su tipo y rubro correctos, y si no hay ningún caso abierto lo crea
+   con el nombre y el período que saca del propio enunciado. La operación que no reconoce la informa en vez de inventarla, y
    nunca propone un asiento descuadrado.
 2. **Revisa el caso abierto con sus cifras reales.** «¿Cómo está mi caso?» devuelve el
    resumen con sus importes; «¿por qué no cuadra?» recorre los asientos y nombra el que

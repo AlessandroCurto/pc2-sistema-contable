@@ -763,9 +763,9 @@ def _puntaje(ficha: Ficha, pregunta: str) -> float:
 
 def hay_enunciado(pregunta: str, caso: Optional[CasoDominio]) -> bool:
     """¿El texto es un enunciado que se puede convertir en asientos?"""
-    if caso is None or not enunciados.parece_enunciado(pregunta):
+    if not enunciados.parece_enunciado(pregunta):
         return False
-    return bool(enunciados.leer(pregunta, caso).asientos)
+    return bool(enunciados.leer(pregunta, caso or enunciados.CASO_VACIO).asientos)
 
 
 def responder(pregunta: str, caso: Optional[CasoDominio] = None) -> str:
@@ -776,13 +776,7 @@ def responder(pregunta: str, caso: Optional[CasoDominio] = None) -> str:
 
     # Un enunciado pegado se resuelve, no se busca en las fichas.
     if enunciados.parece_enunciado(pregunta):
-        if caso is None:
-            return (
-                "Eso parece un enunciado, y puedo resolverlo — pero necesito un caso "
-                "abierto para saber con qué plan de cuentas trabajar.\n\n"
-                "Ve a **Casos**, crea uno (o carga un ejemplo) y vuelve a pegármelo."
-            )
-        return enunciados.a_markdown(enunciados.leer(pregunta, caso), caso)
+        return enunciados.resolver(pregunta, caso)
 
     puntuadas = sorted(
         ((_puntaje(f, limpia), f) for f in FICHAS), key=lambda par: par[0], reverse=True

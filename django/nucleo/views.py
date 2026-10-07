@@ -653,29 +653,63 @@ def chatbot(request):
     return respuesta
 
 
+class _SinAsientos(Exception):
+    """Corta la transacción para no dejar un caso vacío a medio crear."""
+
+
 @require_POST
 def asistente_registrar(request):
-    """Guarda en el caso los asientos que el asistente leyó de un enunciado."""
-    caso = caso_activo(request)
-    if caso is None:
-        return JsonResponse({"error": "No hay ningún caso abierto."}, status=400)
+    """Guarda en el caso los asientos que el asistente leyó de un enunciado.
+
+    Si no hay caso abierto lo crea con los datos del propio enunciado, y si al
+    plan de cuentas le faltan cuentas las agrega: así el estudiante solo tiene
+    que pegar el texto.
+    """
     try:
         texto = json.loads(request.body.decode("utf-8")).get("texto", "")
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"error": "No se pudo leer el enunciado."}, status=400)
     if not isinstance(texto, str) or not texto.strip():
         return JsonResponse({"error": "No se pudo leer el enunciado."}, status=400)
+    texto = texto[:CHAT_MAX_CARACTERES]
 
-    dominio = caso.a_dominio()
-    lectura = enunciados.leer(texto[:CHAT_MAX_CARACTERES], dominio)
-    if not lectura.asientos:
+    caso = caso_activo(request)
+    creado = caso is None
+    try:
+        with transaction.atomic():
+            if caso is None:
+                caso = Caso.objects.create(**enunciados.datos_del_caso(texto))
+
+            lectura = enunciados.leer(texto, caso.a_dominio())
+            if not lectura.asientos:
+                raise _SinAsientos()
+
+            # Se cuentan antes de crearlas: después ya no son nuevas.
+            agregadas = len(lectura.cuentas_nuevas)
+            for nueva in lectura.cuentas_nuevas:
+                Cuenta.objects.get_or_create(
+                    caso=caso,
+                    codigo=nueva.codigo,
+                    defaults={
+                        "nombre": nueva.nombre,
+                        "tipo": nueva.tipo.value,
+                        "rubro": nueva.rubro.value if nueva.rubro else "",
+                    },
+                )
+
+            # Se relee con el plan ya completo: ahora las cuentas son reales.
+            dominio = caso.a_dominio()
+            lectura = enunciados.leer(texto, dominio)
+            resultado = importar_asientos(caso, enunciados.a_importables(lectura, dominio))
+    except _SinAsientos:
         return JsonResponse({"error": "Ya no reconozco asientos en ese texto."}, status=400)
 
-    resultado = importar_asientos(caso, enunciados.a_importables(lectura, dominio))
-    return JsonResponse(
-        {
-            "guardados": resultado.importados,
-            "errores": resultado.errores,
-            "url": reverse("libro_diario"),
-        }
-    )
+    if creado:
+        abrir_caso(request, caso)
+    return JsonResponse({
+        "guardados": resultado.importados,
+        "errores": resultado.errores,
+        "cuentas": agregadas,
+        "caso": caso.nombre if creado else "",
+        "url": reverse("libro_diario"),
+    })

@@ -25,7 +25,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 
 from ..dominio.tipos import Caso as CasoDominio
-from ..dominio.tipos import Cuenta, TipoCuenta
+from ..dominio.tipos import Cuenta, Empresa, Rubro, TipoCuenta
 
 IGV = Decimal("0.18")
 UNO_MAS_IGV = Decimal("1.18")
@@ -62,7 +62,36 @@ PAPELES: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     "ventas": (("ventas",),),
     "costo_ventas": (("costo de ventas",),),
     "arriendo": (("arriendo",), ("alquiler",)),
+    "personal": (("personal",), ("sueldos",), ("remuneraciones",)),
+    "servicios": (("servicios",),),
 }
+
+#: Si al plan de cuentas le falta una de estas, el asistente la puede crear.
+#: Los códigos son los del plan "numerado", que es el de estos enunciados.
+ESTANDAR: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
+    "caja": ("101", "Caja", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "banco": ("102", "Banco", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "clientes": ("103", "Clientes", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "letras_cobrar": ("104", "Letras por Cobrar", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "mercaderias": ("105", "Mercaderías", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "igv_credito": ("106", "IGV Crédito Fiscal", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "proveedores": ("201", "Proveedores", TipoCuenta.PASIVO, Rubro.CORRIENTE),
+    "letras_pagar": ("202", "Letras por Pagar", TipoCuenta.PASIVO, Rubro.CORRIENTE),
+    "igv_debito": ("203", "IGV Débito Fiscal", TipoCuenta.PASIVO, Rubro.CORRIENTE),
+    "capital": ("301", "Capital", TipoCuenta.PATRIMONIO, None),
+    "ventas": ("401", "Ventas", TipoCuenta.INGRESO, Rubro.VENTAS),
+    "arriendo": ("501", "Gastos de Arriendo", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
+    "costo_ventas": ("502", "Costo de Ventas", TipoCuenta.GASTO, Rubro.COSTO_VENTAS),
+    "personal": ("503", "Gastos de Personal", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
+    "servicios": ("504", "Gastos de Servicios", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
+}
+
+#: Qué cuenta de gasto usar según cómo el enunciado nombre el desembolso.
+GASTOS = (
+    ("personal", ("sueldos", "remuneraciones", "planilla", "personal", "salarios")),
+    ("servicios", ("servicios", "luz", "agua", "telefono", "internet", "energia")),
+    ("arriendo", ("arriendo", "alquiler")),
+)
 
 #: Para el asiento de apertura: cómo se nombra cada partida en el enunciado.
 PARTIDAS_APERTURA: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
@@ -78,16 +107,20 @@ PARTIDAS_APERTURA: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
 
 
 class Plan:
-    """Encuentra, en el plan de cuentas del caso, la cuenta de cada papel."""
+    """Encuentra, en el plan de cuentas del caso, la cuenta de cada papel.
 
-    def __init__(self, caso: CasoDominio):
+    Con `crear=True`, la cuenta que no existe no es un fracaso: se propone
+    crearla con su tipo y rubro correctos, y queda anotada en `nuevas`. Así el
+    estudiante pega el enunciado sin haber armado antes el plan de cuentas.
+    """
+
+    def __init__(self, caso: CasoDominio, crear: bool = False):
         self.caso = caso
+        self.crear = crear
+        self.nuevas: Dict[str, Cuenta] = {}
         self._cache: Dict[str, Optional[Cuenta]] = {}
 
-    def __call__(self, papel: str) -> Optional[Cuenta]:
-        if papel in self._cache:
-            return self._cache[papel]
-        encontrada = None
+    def _buscar(self, papel: str) -> Optional[Cuenta]:
         for grupo in PAPELES.get(papel, ()):
             for cuenta in self.caso.cuentas:
                 nombre = _plano(cuenta.nombre)
@@ -95,10 +128,37 @@ class Plan:
                     # "Ventas" no debe casar con "Costo de ventas".
                     if papel == "ventas" and cuenta.tipo != TipoCuenta.INGRESO:
                         continue
-                    encontrada = cuenta
-                    break
-            if encontrada is not None:
-                break
+                    if papel != "costo_ventas" and cuenta.tipo == TipoCuenta.GASTO                             and papel in ("ventas",):
+                        continue
+                    return cuenta
+        return None
+
+    def _codigo_libre(self, deseado: str) -> str:
+        ocupados = {c.codigo for c in self.caso.cuentas} | {
+            c.codigo for c in self.nuevas.values()
+        }
+        if deseado not in ocupados:
+            return deseado
+        for sufijo in range(1, 50):
+            tentativa = f"{deseado}-{sufijo}"
+            if tentativa not in ocupados:
+                return tentativa
+        return deseado
+
+    def __call__(self, papel: str) -> Optional[Cuenta]:
+        if papel in self._cache:
+            return self._cache[papel]
+        encontrada = self._buscar(papel)
+        if encontrada is None and self.crear and papel in ESTANDAR:
+            codigo, nombre, tipo, rubro = ESTANDAR[papel]
+            encontrada = Cuenta(
+                id="nueva:" + papel,
+                codigo=self._codigo_libre(codigo),
+                nombre=nombre,
+                tipo=tipo,
+                rubro=rubro,
+            )
+            self.nuevas[papel] = encontrada
         self._cache[papel] = encontrada
         return encontrada
 
@@ -148,6 +208,8 @@ class Lectura:
     problemas: List[str] = field(default_factory=list)
     #: Avisos que no impiden el asiento (fechas raras, supuestos tomados).
     avisos: List[str] = field(default_factory=list)
+    #: Cuentas que hay que agregar al plan antes de registrar.
+    cuentas_nuevas: List[Cuenta] = field(default_factory=list)
 
     @property
     def hubo_algo(self) -> bool:
@@ -477,9 +539,14 @@ def _gasto(texto: str, plan: Plan, memoria: Memoria):
     if "mas igv" in plano or "mas el igv" in plano:
         base, igv, explico = _separar_igv(texto, monto)
 
-    cuenta_gasto = plan("arriendo")
+    papel = "arriendo"
+    for candidato, claves in GASTOS:
+        if any(clave in plano for clave in claves):
+            papel = candidato
+            break
+    cuenta_gasto = plan(papel)
     if cuenta_gasto is None:
-        return None, "falta la cuenta del gasto (arriendo o similar)"
+        return None, "falta la cuenta del gasto (arriendo, personal o servicios)"
     contra, forma = _forma_de_pago(texto, plan)
     if contra is None:
         return None, "falta la cuenta con la que se paga"
@@ -667,10 +734,10 @@ CONSTRUCTORES = {
 }
 
 
-def leer(texto: str, caso: CasoDominio) -> Lectura:
+def leer(texto: str, caso: CasoDominio, crear_cuentas: bool = True) -> Lectura:
     """Convierte el enunciado en asientos propuestos."""
     lectura = Lectura()
-    plan = Plan(caso)
+    plan = Plan(caso, crear=crear_cuentas)
     memoria = Memoria()
 
     for numero, bloque in enumerate(_partir(texto), start=1):
@@ -690,6 +757,10 @@ def leer(texto: str, caso: CasoDominio) -> Lectura:
             )
             continue
         lectura.asientos.append(asiento)
+
+    # Solo las cuentas que de verdad usó algún asiento propuesto.
+    usadas = {l.cuenta.codigo for a in lectura.asientos for l in a.lineas}
+    lectura.cuentas_nuevas = [c for c in plan.nuevas.values() if c.codigo in usadas]
 
     anios = {a.fecha.year for a in lectura.asientos if a.fecha}
     if len(anios) > 1:
@@ -788,3 +859,70 @@ def parece_enunciado(texto: str) -> bool:
     fechas = len(FECHA.findall(texto))
     importes = len(IMPORTE_CON_MONEDA.findall(texto)) + len(IMPORTE_SUELTO.findall(texto))
     return importes >= 2 and (fechas >= 1 or operaciones >= 2)
+
+
+# ------------------------------------------------- crear el caso de la nada
+
+EMPRESA = re.compile(
+    r"(?:la\s+empresa\s+|empresa\s*:\s*)([A-ZÁÉÍÓÚÑ][^.,;:\n]{2,70}?"
+    r"(?:S\.?A\.?C?\.?|E\.?I\.?R\.?L\.?|S\.?R\.?L\.?))",
+    re.IGNORECASE,
+)
+
+
+def datos_del_caso(texto: str) -> dict:
+    """Saca del enunciado lo necesario para crear el caso: nombre y período."""
+    nombre = "Caso del enunciado"
+    hallada = EMPRESA.search(texto)
+    if hallada:
+        nombre = " ".join(hallada.group(1).split())[:80]
+
+    fechas = []
+    for dia, mes, anio in FECHA.findall(texto):
+        anio = int(anio)
+        if anio < 100:
+            anio += 2000
+        try:
+            fechas.append(date(anio, int(mes), int(dia)))
+        except ValueError:
+            continue
+    # Si el enunciado mezcla años (suele ser un tipeo), se usa el más repetido.
+    if fechas:
+        comun = max({f.year for f in fechas}, key=lambda a: sum(1 for f in fechas if f.year == a))
+        delmes = [f for f in fechas if f.year == comun]
+        inicio, fin = min(delmes), max(delmes)
+    else:
+        inicio = fin = None
+    return {"nombre": nombre, "razon_social": nombre, "periodo_inicio": inicio, "periodo_fin": fin}
+
+
+#: Un caso sin nada, para leer un enunciado cuando el usuario no tiene ninguno
+#: abierto: todas las cuentas salen como nuevas.
+CASO_VACIO = CasoDominio(id="", nombre="", empresa=Empresa(nombre=""))
+
+
+def resolver(texto: str, caso: Optional[CasoDominio]) -> str:
+    """La respuesta del asistente ante un enunciado pegado en el chat."""
+    sin_caso = caso is None
+    base = caso or CASO_VACIO
+    lectura = leer(texto, base)
+    cuerpo = a_markdown(lectura, base)
+    if not lectura.asientos:
+        return cuerpo
+
+    encabezado = []
+    if sin_caso:
+        datos = datos_del_caso(texto)
+        encabezado.append(
+            f"No tenías ningún caso abierto, así que preparé uno nuevo: "
+            f"**{datos['nombre']}**, con su plan de cuentas. Lo creo al registrar."
+        )
+    elif lectura.cuentas_nuevas:
+        nombres = ", ".join(f"**{c.codigo} {c.nombre}**" for c in lectura.cuentas_nuevas)
+        encabezado.append(
+            f"A tu plan de cuentas le faltan {len(lectura.cuentas_nuevas)} cuenta(s) para "
+            f"este caso: {nombres}. Las agrego al registrar."
+        )
+    if encabezado:
+        return "\n\n".join(encabezado) + "\n\n" + cuerpo
+    return cuerpo

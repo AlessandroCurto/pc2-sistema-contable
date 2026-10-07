@@ -203,6 +203,9 @@
     var pie = document.createElement('p');
     pie.className = 'chat-accion-pie';
     pie.textContent = 'Revísalos antes. Se guardan en el Libro Diario.';
+    if (/Creé |preparé un|A tu plan/.test(nodos.mensajes.textContent || '')) {
+      pie.textContent = 'Revísalos antes. Creo lo que falte y los guardo.';
+    }
     caja.appendChild(boton);
     caja.appendChild(pie);
     nodos.mensajes.appendChild(caja);
@@ -223,13 +226,14 @@
         .then(function (d) {
           caja.remove();
           if (d.error) { aviso(d.error); return; }
-          var hechos = pintar(
-            'Listo: guardé **' + d.guardados + ' asiento(s)** en el caso. ' +
-            'Los ves en el [Libro Diario](' + d.url + ').',
-            'assistant',
-            true
+          var partes = [];
+          if (d.caso) partes.push('Creé el caso **' + d.caso + '**.');
+          if (d.cuentas) partes.push('Agregué ' + d.cuentas + ' cuenta(s) al plan.');
+          partes.push(
+            'Guardé **' + d.guardados + ' asiento(s)**. ' +
+            'Los ves en el [Libro Diario](' + d.url + ').'
           );
-          void hechos;
+          pintar(partes.join(' '), 'assistant', true);
           (d.errores || []).forEach(function (e) { aviso(e); });
         })
         .catch(function () {
