@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 154 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 162 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -109,9 +109,15 @@ servidor (`servicios/asistente.py`). Hace tres cosas:
    medias), lo abre y recarga la pantalla. Si no existe, lo dice y lista los que hay.
 4. **Explica el sistema**: registrar asientos, importar desde Excel, plan de cuentas,
    descargas, configuración y los cinco reportes.
-5. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
+5. **Responde por sí mismo**: «¿cuál es la tasa que usas?» o «¿cómo funciona la página?».
+6. **Explica la teoría**: partida doble, qué va al Debe y al Haber, IGV, impuesto a la
    renta, costo de ventas, letras y el ciclo contable. También hace la cuenta si le pasas
    un monto («cuánto es el IGV de 1,000,000 incluido»).
+
+Las preguntas no hace falta escribirlas con las palabras exactas de la ficha: se comparan
+los comienzos, así que «calculas», «cálculo» y «calcular» llegan al mismo sitio. Y «mi»
+decide entre el método y la cifra: *calcular el costo de ventas* explica cómo, *mi costo de
+ventas* da el número.
 
 Cuando no reconoce la pregunta **lo dice** y ofrece los temas cercanos; nunca inventa una
 respuesta ni un botón que no existe.

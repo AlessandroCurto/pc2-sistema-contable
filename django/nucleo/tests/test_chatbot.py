@@ -545,3 +545,103 @@ class MuluniTest(TestCase):
         js = (settings.BASE_DIR / "nucleo/static/nucleo/chatbot.js").read_text(encoding="utf-8")
         self.assertIn("<strong>MULUNI</strong>", js)
         self.assertNotIn("Asistente contable</strong>", js)
+
+
+class VariantesDeLasPalabrasTest(TestCase):
+    """Nadie escribe la palabra exacta: hay que aceptar las formas derivadas."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR)
+        cls.dominio = cls.caso.a_dominio()
+
+    def test_reconoce_la_misma_palabra_en_otra_forma(self):
+        iguales = [
+            ("tasa", "tasas"), ("asiento", "asientos"), ("cuenta", "cuentas"),
+            ("calcular", "calculas"), ("calcular", "calculo"), ("registrar", "registro"),
+            ("importar", "importacion"), ("letra", "letras"), ("costo", "costos"),
+        ]
+        for una, otra in iguales:
+            with self.subTest(par=(una, otra)):
+                self.assertTrue(asistente.misma_raiz(una, otra))
+
+    def test_no_confunde_palabras_distintas(self):
+        """Comparar comienzos tiene un límite: «venta» y «ventaja» lo comparten.
+
+        Se acepta porque ninguna de esas palabras aparece en estas preguntas; lo
+        que no debe pasar es que se confundan términos que sí se usan aquí.
+        """
+        distintas = [("pagar", "pagina"), ("caso", "casi"), ("activo", "adjetivo"),
+                     ("debe", "haber"), ("compra", "cobro"), ("cuenta", "cuadre")]
+        for una, otra in distintas:
+            with self.subTest(par=(una, otra)):
+                self.assertFalse(asistente.misma_raiz(una, otra), f"{una} / {otra}")
+
+    def test_varias_formas_llegan_a_la_misma_ficha(self):
+        esperados = {
+            "como registro asientos": "Registrar un asiento",
+            "quiero registrar un asiento": "Registrar un asiento",
+            "el registro de asientos": "Registrar un asiento",
+            "importar desde excel": "Importar asientos",
+            "la importacion de excel": "Importar asientos",
+            "que son las letras": "Letras de cambio",
+            "la letra de cambio": "Letras de cambio",
+            "las cuentas del plan": "Plan de Cuentas",
+        }
+        for pregunta, titulo in esperados.items():
+            with self.subTest(pregunta=pregunta):
+                self.assertIn(titulo, asistente.responder(pregunta, self.dominio))
+
+
+class PreguntasSobreElSistemaTest(TestCase):
+    """«¿Cuál es la tasa que usas?» pregunta por el sistema, no por el caso."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR)
+        cls.dominio = cls.caso.a_dominio()
+
+    def test_responde_por_sus_tasas(self):
+        for pregunta in ("¿cuál es la tasa que usas?", "que tasa usas",
+                         "con que igv trabajas", "que porcentaje de impuesto aplicas",
+                         "cuantos decimales usas", "como redondeas"):
+            with self.subTest(pregunta=pregunta):
+                respuesta = asistente.responder(pregunta, self.dominio)
+                self.assertIn("18%", respuesta)
+                self.assertIn("29.5%", respuesta)
+
+    def test_incluye_la_tasa_del_caso_abierto(self):
+        respuesta = asistente.responder("que tasa usas", self.dominio)
+        self.assertIn("Comercializadora del Sur", respuesta)
+        self.assertIn("29.5", respuesta)
+
+    def test_avisa_cuando_el_caso_quedo_en_cero(self):
+        self.caso.tasa_impuesto_renta = 0
+        self.caso.save()
+        respuesta = asistente.responder("que tasa usas", self.caso.a_dominio())
+        self.assertIn("Con 0% no se calcula impuesto", respuesta)
+
+    def test_explica_como_funciona_la_pagina(self):
+        for pregunta in ("como funciona la pagina", "que hace el sistema",
+                         "como trabaja esto", "para que sirve esta pagina", "como se usa"):
+            with self.subTest(pregunta=pregunta):
+                self.assertIn("Cómo funciona", asistente.responder(pregunta, self.dominio))
+
+    def test_distingue_el_metodo_de_la_cifra(self):
+        metodo = {
+            "para calcular el impuesto": "## Impuesto a la renta",
+            "calcular el costo de ventas": "## Costo de ventas por diferencia",
+            "el calculo del igv": "## El IGV",
+        }
+        for pregunta, inicio in metodo.items():
+            with self.subTest(pregunta=pregunta):
+                self.assertTrue(asistente.responder(pregunta, self.dominio).startswith(inicio))
+
+        # Con "mi" delante, lo que quiere es su número.
+        cifra = {
+            "cual es mi costo de ventas": "157,097.63",
+            "cuanto es mi impuesto a la renta": "42,156.20",
+        }
+        for pregunta, numero in cifra.items():
+            with self.subTest(pregunta=pregunta):
+                self.assertIn(numero, asistente.responder(pregunta, self.dominio))

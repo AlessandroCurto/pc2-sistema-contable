@@ -273,16 +273,28 @@ CIFRAS: List[tuple] = [
     ("Utilidad neta", "resultado", ("utilidad", "ganancia"), lambda e, g, b: e.utilidad_neta),
 ]
 
-#: Si la pregunta empieza así, quiere la explicación y no el número.
-QUIERE_TEORIA = ("que es", "como se calcula", "como calculo", "como se saca",
-                 "que significa", "para que sirve", "definicion", "concepto de",
-                 "explicame", "explica")
+#: Si la pregunta trae algo de esto, quiere la explicación y no el número.
+#: Se busca en cualquier parte: "¿y el impuesto cómo se calcula?" también cuenta.
+QUIERE_TEORIA = (
+    "que es", "que son", "que significa", "definicion", "concepto", "formula",
+    "como se calcula", "como calcula", "como calculas", "como calcular", "como calculo",
+    "calcular", "calculo del", "el calculo",
+    "como se saca", "como sacas", "como saco", "como obtienes", "como se obtiene",
+    "como se halla", "para calcular", "para hallar", "para que sirve", "como funciona",
+    "explicame", "explica",
+    # Preguntas sobre los parámetros del propio sistema, no sobre el caso.
+    "que tasa", "que porcentaje", "que igv", "cual es la tasa", "usas", "aplicas",
+    "trabajas", "manejas", "redondeas",
+)
 
 
 def cifra_pedida(pregunta: str) -> Optional[int]:
     """La posición en CIFRAS de lo que está preguntando, si pide una cifra."""
     limpia = normalizar(pregunta).strip()
-    if any(limpia.startswith(inicio) for inicio in QUIERE_TEORIA):
+    # "mi" / "mis" manda: quien dice "mi costo de ventas" quiere su número,
+    # aunque la frase traiga un verbo que en otro contexto pediría la teoría.
+    suyo = re.search(r"(mi|mis)", limpia) is not None
+    if not suyo and any(marca in limpia for marca in QUIERE_TEORIA):
         return None
     for indice, (_, _, palabras, _) in enumerate(CIFRAS):
         if any(palabra in limpia for palabra in palabras):
@@ -345,6 +357,49 @@ def _responder_cifra(indice: int, caso: Optional[CasoDominio]) -> str:
         "\nSi lo que querías era la explicación y no el número, pregúntame "
         "*cómo se calcula* eso mismo."
     )
+    return "\n".join(partes)
+
+
+def _parametros(caso: Optional[CasoDominio]) -> str:
+    """Con qué números trabaja la aplicación, y los del caso abierto."""
+    partes = [
+        "## Las tasas que uso",
+        "",
+        "| Concepto | Tasa |",
+        "| --- | --- |",
+        "| IGV | **18%** (Perú). Fija: está en el cálculo, no se configura. |",
+        "| Impuesto a la renta | **29.5%** por omisión (tercera categoría), "
+        "pero se cambia por caso en **Configuración**. |",
+        "",
+    ]
+    if caso is not None:
+        tasa = caso.empresa.tasa_impuesto_renta
+        partes += [
+            f"En tu caso **{caso.empresa.nombre}** la tasa del impuesto a la renta está "
+            f"en **{tasa}%**.",
+            "",
+        ]
+        if tasa == 0:
+            partes.append(
+                "Con 0% no se calcula impuesto, así que tu utilidad neta sale igual a la "
+                "utilidad antes de impuesto. Si eso no es lo que quieres, cámbiala a 29.5 "
+                "en **Sistema → Configuración**."
+            )
+        else:
+            partes.append(
+                "El impuesto se aplica solo si el resultado es positivo; si hay pérdida, es 0."
+            )
+        partes.append("")
+    partes += [
+        "## Cómo hago las cuentas",
+        "",
+        "- Trabajo con **decimales exactos**, no con los números con coma flotante del "
+        "navegador: 0.1 + 0.2 da exactamente 0.30.",
+        "- Redondeo a **2 decimales**, al alza desde el 5 (medio hacia arriba).",
+        "- Los cinco reportes salen siempre de tus asientos; no guardo totales aparte, "
+        "así que no pueden quedar desfasados.",
+        "- Un asiento **solo se guarda si el Debe iguala al Haber**.",
+    ]
     return "\n".join(partes)
 
 
@@ -670,8 +725,9 @@ Ejemplos:
         clave="igv-teoria",
         titulo="Cómo se calcula el IGV",
         frases=[
-            "como se calcula el igv", "calcular igv", "que es el igv", "igv incluido",
-            "mas igv", "sacar el igv", "igv credito fiscal", "igv debito fiscal", "como saco el igv",
+            "como se calcula el igv", "calcular igv", "calcular el igv", "que es el igv",
+            "igv incluido", "mas igv", "sacar el igv", "igv credito fiscal",
+            "igv debito fiscal", "como saco el igv", "calculo del igv", "hallar el igv",
         ],
         palabras=["igv", "calcular", "incluido", "credito", "debito", "fiscal", "18"],
         texto="""## El IGV (18% en Perú)
@@ -706,9 +762,10 @@ Al cierre del mes se netean: si el débito supera al crédito, la diferencia se 
         titulo="Impuesto a la renta",
         frases=[
             "impuesto a la renta", "29.5", "como se calcula el impuesto", "tercera categoria",
-            "utilidad neta", "impuesto sobre la utilidad",
+            "utilidad neta", "impuesto sobre la utilidad", "calcular el impuesto",
+            "calculo del impuesto", "hallar el impuesto",
         ],
-        palabras=["impuesto", "renta", "utilidad", "neta", "categoria"],
+        palabras=["impuesto", "renta", "utilidad", "neta", "categoria", "calcular"],
         texto="""## Impuesto a la renta
 
 La tasa de **tercera categoría en Perú es 29.5%** y se aplica sobre el resultado antes de
@@ -742,8 +799,10 @@ patrimonio queda inflado.""",
         frases=[
             "costo de ventas", "diferencia de inventarios", "como calculo el costo",
             "existencia final", "inventario final", "asiento de costo de ventas",
+            "calcular el costo", "calculo del costo", "hallar el costo",
         ],
-        palabras=["costo", "ventas", "inventario", "inventarios", "existencia", "diferencia"],
+        palabras=["costo", "ventas", "inventario", "inventarios", "existencia", "diferencia",
+                  "calcular"],
         texto="""## Costo de ventas por diferencia de inventarios
 
 La fórmula:
@@ -822,6 +881,49 @@ Cobras dos letras de 70,800 cada una:
 El patrimonio no se mueve: cambiaste un activo por otro.""",
     ),
     Ficha(
+        clave="parametros",
+        titulo="Las tasas que uso",
+        frases=[
+            "que tasa usas", "cual es la tasa que usas", "cual es la tasa", "que tasa aplicas",
+            "que tasa usa", "con que tasa", "que igv usas", "que igv aplicas", "con que igv",
+            "que porcentaje usas", "que impuesto aplicas", "que impuesto usas",
+            "con que numeros trabajas", "que tasas manejas", "como redondeas",
+            "cuantos decimales", "que tasa tienes",
+        ],
+        palabras=["tasa", "tasas", "usas", "aplicas", "porcentaje", "redondeas", "decimales"],
+        vivo=_parametros,
+    ),
+    Ficha(
+        clave="como-funciona",
+        titulo="Cómo funciona la página",
+        frases=[
+            "como funciona", "como trabaja", "que hace la pagina", "que hace el sistema",
+            "de que trata", "como esta hecha", "que puedo hacer aqui", "para que sirve esta",
+            "como se usa", "explicame la pagina", "como opera",
+        ],
+        palabras=["funciona", "trabaja", "pagina", "sistema", "sirve"],
+        texto="""## Cómo funciona
+
+Tú registras **asientos** y la aplicación calcula todo lo demás. No hay nada que llenar
+dos veces ni totales que se guarden aparte: los cinco reportes se arman cada vez a partir
+de tus asientos, así que nunca quedan desfasados.
+
+El orden de trabajo:
+
+1. **Casos** — un caso es una empresa con su plan de cuentas y sus asientos. Puedes tener
+   varios y cambiar entre ellos.
+2. **Plan de Cuentas** — las cuentas con su código, nombre y tipo. El tipo decide de qué
+   lado suma cada cuenta y en qué bloque del Balance General aparece.
+3. **Registrar Asiento** — fecha, glosa y las líneas. Solo se guarda si Debe = Haber.
+   También puedes importarlos desde Excel, o pegarme el enunciado y yo los armo.
+4. **Reportes** — Libro Diario, Libro Mayor, Balance de Comprobación, Estado de Resultados
+   y Balance General, todos automáticos.
+5. **Descargas** — el PDF con las secciones que elijas, o un Excel con una hoja por reporte.
+
+Las cuentas las hago con decimales exactos y redondeo a 2 decimales, así los totales
+cuadran al céntimo. Uso IGV del 18% y, por omisión, 29.5% de impuesto a la renta.""",
+    ),
+    Ficha(
         clave="que-puedes-hacer",
         titulo="Qué puedo hacer",
         frases=[
@@ -854,15 +956,30 @@ También hago cuentas: *«cuánto es el IGV de 1,000,000 incluido»*.""",
 UMBRAL = 2.0
 
 
+def misma_raiz(una: str, otra: str) -> bool:
+    """¿Son la misma palabra en otra forma?
+
+    Nadie escribe la palabra exacta de la ficha: pregunta «cómo calculas», «el
+    cálculo» o «para calcular». Comparar el comienzo cubre singular/plural y
+    las conjugaciones sin necesidad de un diccionario.
+    """
+    if una == otra:
+        return True
+    corto, largo = sorted((una, otra), key=len)
+    if len(corto) >= 4 and largo.startswith(corto):
+        return True
+    return len(corto) >= 5 and corto[:5] == largo[:5]
+
+
 def _puntaje(ficha: Ficha, pregunta: str) -> float:
     puntos = 0.0
     for frase in ficha.frases:
         if frase in pregunta:
             # Una frase larga que calza es mucha más señal que una palabra suelta.
             puntos += 4.0 + len(frase) / 20
-    palabras = set(pregunta.split())
+    palabras = pregunta.split()
     for palabra in ficha.palabras:
-        if palabra in palabras:
+        if any(misma_raiz(palabra, suya) for suya in palabras):
             puntos += 1.0
     return puntos
 
