@@ -183,3 +183,23 @@ class LineaAsiento(models.Model):
             debe=self.debe,
             haber=self.haber,
         )
+
+
+class UsoAsistente(models.Model):
+    """Cuántas consultas del asistente llegaron a la API en un día.
+
+    La página es pública: sin un tope global, cualquiera podría gastar el saldo
+    de la cuenta. El límite por sesión no alcanza, porque basta con borrar las
+    cookies para empezar otra. Esta cuenta es de todo el sitio.
+    """
+
+    fecha = models.DateField("fecha", unique=True)
+    consultas = models.PositiveIntegerField("consultas a la API", default=0)
+
+    class Meta:
+        verbose_name = "uso del asistente"
+        verbose_name_plural = "uso del asistente"
+        ordering = ["-fecha"]
+
+    def __str__(self) -> str:
+        return f"{self.fecha}: {self.consultas}"

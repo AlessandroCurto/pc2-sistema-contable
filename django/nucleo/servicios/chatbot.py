@@ -208,18 +208,21 @@ def hay_api() -> bool:
 
 
 def responder_en_vivo(
-    mensajes: List[Dict[str, str]], caso: Optional[CasoDominio] = None
+    mensajes: List[Dict[str, str]],
+    caso: Optional[CasoDominio] = None,
+    permitir_api: bool = False,
 ) -> Iterator[str]:
     """Devuelve la respuesta por pedazos, para escribirla en pantalla al vuelo.
 
     Primero contesta el asistente local, que no cuesta nada y para las preguntas
-    que conoce es más exacto (lee el caso y usa el motor contable). Solo si no
-    entendió la pregunta, y solo si hay clave de API, se consulta al modelo.
+    que conoce es más exacto (lee el caso y usa el motor contable). La vista
+    decide en `permitir_api` si esta pregunta puede llegar al modelo: solo
+    cuando lo local no la entendió, hay clave y al sitio le queda cupo del día.
     """
     pregunta = mensajes[-1]["content"] if mensajes else ""
     local = asistente.responder(pregunta, caso)
 
-    if not asistente.fue_entendida(pregunta) and hay_api():
+    if permitir_api:
         try:
             yield from _responder_con_api(mensajes, caso)
             return

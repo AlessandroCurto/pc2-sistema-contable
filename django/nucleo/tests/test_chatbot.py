@@ -4,7 +4,10 @@ No llaman a la API: la respuesta del modelo se reemplaza por una falsa.
 """
 
 import json
+from datetime import timedelta
 from unittest.mock import patch
+
+from django.utils import timezone
 
 from django.test import TestCase
 from django.urls import reverse
@@ -319,3 +322,93 @@ class SinClaveDeApiTest(TestCase):
                 )
                 b"".join(respuesta.streaming_content)
             api.assert_not_called()
+
+
+class TopeDiarioGlobalTest(TestCase):
+    """El sitio es público: sin tope global cualquiera podría gastar el saldo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(CYBERTEC)
+
+    def _preguntar_raro(self):
+        """Una pregunta que lo local no entiende, o sea candidata a la API."""
+        return self.client.post(
+            reverse("chatbot"),
+            data=json.dumps(
+                {"mensajes": [{"role": "user", "content": "quien gano el mundial del 86"}]}
+            ),
+            content_type="application/json",
+        )
+
+    def _leer(self, respuesta):
+        return b"".join(respuesta.streaming_content).decode("utf-8")
+
+    def test_cuenta_solo_lo_que_llega_a_la_api(self):
+        from ..models import UsoAsistente
+
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-de-prueba"}, clear=False):
+            with patch.object(servicio, "_responder_con_api") as api:
+                api.return_value = iter(["respuesta del modelo"])
+                self._leer(self._preguntar_raro())
+        self.assertEqual(UsoAsistente.objects.get().consultas, 1)
+
+    def test_una_pregunta_que_lo_local_entiende_no_gasta(self):
+        from ..models import UsoAsistente
+
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-de-prueba"}, clear=False):
+            with patch.object(servicio, "_responder_con_api") as api:
+                self.client.post(
+                    reverse("chatbot"),
+                    data=json.dumps(
+                        {"mensajes": [{"role": "user", "content": "como registro un asiento"}]}
+                    ),
+                    content_type="application/json",
+                )
+                api.assert_not_called()
+        self.assertFalse(UsoAsistente.objects.exists())
+
+    def test_sin_clave_no_cuenta_nada(self):
+        from ..models import UsoAsistente
+
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}, clear=False):
+            self._leer(self._preguntar_raro())
+        self.assertFalse(UsoAsistente.objects.exists())
+
+    def test_agotado_el_cupo_sigue_respondiendo_pero_gratis(self):
+        from ..models import UsoAsistente
+        from ..views import CHAT_TOPE_DIARIO
+
+        UsoAsistente.objects.create(
+            fecha=timezone.localdate(), consultas=CHAT_TOPE_DIARIO
+        )
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-de-prueba"}, clear=False):
+            with patch.object(servicio, "_responder_con_api") as api:
+                cuerpo = self._leer(self._preguntar_raro())
+                api.assert_not_called()
+        # No se rompe: cae en la respuesta local y el contador no sube.
+        self.assertIn("No estoy seguro", cuerpo)
+        self.assertEqual(UsoAsistente.objects.get().consultas, CHAT_TOPE_DIARIO)
+
+    def test_el_tope_se_puede_apagar_del_todo(self):
+        from ..models import UsoAsistente
+
+        with patch("nucleo.views.CHAT_TOPE_DIARIO", 0):
+            with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-x"}, clear=False):
+                with patch.object(servicio, "_responder_con_api") as api:
+                    self._leer(self._preguntar_raro())
+                    api.assert_not_called()
+        self.assertFalse(UsoAsistente.objects.exists())
+
+    def test_el_cupo_es_por_dia(self):
+        from ..models import UsoAsistente
+        from ..views import CHAT_TOPE_DIARIO
+
+        ayer = timezone.localdate() - timedelta(days=1)
+        UsoAsistente.objects.create(fecha=ayer, consultas=CHAT_TOPE_DIARIO)
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-x"}, clear=False):
+            with patch.object(servicio, "_responder_con_api") as api:
+                api.return_value = iter(["ok"])
+                self._leer(self._preguntar_raro())
+                api.assert_called_once()
+        self.assertEqual(UsoAsistente.objects.get(fecha=timezone.localdate()).consultas, 1)

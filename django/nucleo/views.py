@@ -8,13 +8,16 @@ calculó, igual que los componentes de la versión en React.
 from __future__ import annotations
 
 import json
+import os
 import time
 
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import F
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .datos.casos_demo import crear_caso_demo, obtener_plantilla_caso
@@ -38,8 +41,9 @@ from .forms import (
     ReporteForm,
     SeleccionDemoForm,
 )
-from .models import Asiento, Caso, Cuenta
+from .models import Asiento, Caso, Cuenta, UsoAsistente
 from .navegacion import accesos_rapidos
+from .servicios import asistente
 from .servicios import chatbot as chatbot_servicio
 from .servicios import excel as servicio_excel
 from .servicios.casos import (
@@ -532,6 +536,10 @@ def configuracion(request):
 
 #: Tope por sesión y por hora. El sitio es público y cada pregunta cuesta.
 CHAT_TOPE = 40
+
+#: Tope de TODO el sitio por día, para las consultas que llegan a la API.
+#: Se supera y el asistente sigue respondiendo, pero solo con lo local (gratis).
+CHAT_TOPE_DIARIO = int(os.environ.get("CHATBOT_TOPE_DIARIO", "150"))
 CHAT_VENTANA = 3600
 CHAT_MAX_CARACTERES = 4000
 CHAT_MAX_MENSAJES = 20
@@ -549,6 +557,19 @@ def _limite_alcanzado(request) -> bool:
     request.session["chat_ventana"] = inicio
     request.session["chat_usos"] = usos + 1
     return False
+
+
+def _queda_cupo_del_dia() -> bool:
+    """Reserva un lugar del cupo diario. False si ya se agotó."""
+    if CHAT_TOPE_DIARIO <= 0:
+        return False
+    hoy = timezone.localdate()
+    uso, _ = UsoAsistente.objects.get_or_create(fecha=hoy)
+    # Un UPDATE condicional: dos pedidos a la vez no pueden pasarse del tope.
+    reservado = UsoAsistente.objects.filter(
+        pk=uso.pk, consultas__lt=CHAT_TOPE_DIARIO
+    ).update(consultas=F("consultas") + 1)
+    return bool(reservado)
 
 
 def _mensajes_validos(crudos):
@@ -599,9 +620,19 @@ def chatbot(request):
     caso = caso_activo(request)
     dominio = caso.a_dominio() if caso is not None else None
 
+    # La API solo entra si está configurada y si al sitio le queda cupo hoy.
+    pregunta = mensajes[-1]["content"]
+    permitir_api = (
+        chatbot_servicio.hay_api()
+        and not asistente.fue_entendida(pregunta)
+        and _queda_cupo_del_dia()
+    )
+
     def flujo():
         try:
-            for pedazo in chatbot_servicio.responder_en_vivo(mensajes, dominio):
+            for pedazo in chatbot_servicio.responder_en_vivo(
+                mensajes, dominio, permitir_api=permitir_api
+            ):
                 yield _evento(t=pedazo)
         except chatbot_servicio.ChatbotNoConfigurado as error:
             yield _evento(error=str(error))

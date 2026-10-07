@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 85 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 91 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -114,8 +114,20 @@ elige con `CHATBOT_MODELO` (por omisión `claude-sonnet-5-5`).
 
 Sin esa variable no pasa nada: el asistente funciona completo.
 
-Límites de la vista, por si se activa la API: 40 preguntas por hora y por sesión,
-20 mensajes de historial y 4 000 caracteres por mensaje.
+**Tope de gasto.** La página es pública, así que cualquiera que la abra podría gastar
+el saldo de la cuenta. El límite por sesión no alcanza, porque basta con borrar las
+cookies para empezar otra; por eso hay un **tope diario de todo el sitio**
+(`CHATBOT_TOPE_DIARIO`, 150 por omisión) que se lleva en la tabla `UsoAsistente`, una
+fila por día. Solo cuenta lo que llega a la API: las preguntas que responde el
+asistente local no gastan. Al agotarse el cupo **el asistente no se rompe**: sigue
+contestando con lo local, gratis, hasta el día siguiente. Con `CHATBOT_TOPE_DIARIO=0`
+la API queda apagada del todo.
+
+Ese tope es el de la aplicación. El tope duro conviene ponerlo además en
+console.anthropic.com → Billing → límite de gasto mensual.
+
+Otros límites: 40 preguntas por hora y por sesión, 20 mensajes de historial y
+4 000 caracteres por mensaje.
 
 ## Reglas del sistema que no cambiaron
 
