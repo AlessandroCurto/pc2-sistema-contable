@@ -71,6 +71,7 @@ NUMERADO = [
     DefinicionCuenta("502", "Costo de Ventas", "GASTO", "COSTO_VENTAS"),
     DefinicionCuenta("503", "Gastos de Ventas", "GASTO", "GASTO_VENTAS"),
     DefinicionCuenta("504", "Gastos Financieros", "GASTO", "GASTO_FINANCIERO"),
+    DefinicionCuenta("505", "Gastos de Personal", "GASTO", "GASTO_ADMINISTRACION"),
 ]
 
 PLANTILLAS_CUENTAS = [

@@ -36,7 +36,7 @@ Comandos útiles:
 
 | Comando | Para qué |
 | --- | --- |
-| `manage.py test nucleo` | 122 pruebas: motor contable, pantallas, PDF, Excel e importación |
+| `manage.py test nucleo` | 129 pruebas: motor contable, pantallas, PDF, Excel e importación |
 | `manage.py cargar_demo --borrar` | Borra todo y vuelve a cargar los tres casos de clase |
 | `manage.py createsuperuser` | Entrar a `/admin/` y ver las tablas por dentro |
 
@@ -202,6 +202,11 @@ que todo calcula igual que antes:
 | CYBERTEC S.A. | 4 | 0% | 100,000.00 | 10,000.00 |
 | Comercializadora Metropolitana | 8 | 30% | 9,168,776.00 | 105,016.80 |
 | Comercializadora del Sur S.A.C. | 8 | 29.5% | 9,170,697.63 | 100,746.17 |
+| Ferretería Los Andes S.R.L. | 8 | 29.5% | 4,891,400.00 | 70,500.00 |
+
+Los Andes agrega lo que a los otros les falta: compra al contado, venta al contado y
+al crédito, sueldos y cobranza a clientes sin letras. Su enunciado en texto, leído por
+el asistente, da exactamente los mismos asientos (lo comprueba una prueba).
 
 Comercializadora del Sur usa el IGV del 18% (Perú) y junio de 2024 en todos
 los asientos: el enunciado mezcla 2023, 2024 y 2025, que son errores de tipeo.

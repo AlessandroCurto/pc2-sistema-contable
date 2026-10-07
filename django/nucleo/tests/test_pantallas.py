@@ -354,8 +354,10 @@ class CargarDemoTest(TestCase):
     def test_base_vacia_carga_los_ejemplos(self):
         from django.core.management import call_command
 
+        from ..datos.casos_demo import PLANTILLAS_CASO
+
         call_command("cargar_demo", si_vacio=True, stdout=io.StringIO())
-        self.assertEqual(Caso.objects.count(), 3)
+        self.assertEqual(Caso.objects.count(), len(PLANTILLAS_CASO))
 
     def test_con_casos_guardados_no_toca_nada(self):
         from django.core.management import call_command

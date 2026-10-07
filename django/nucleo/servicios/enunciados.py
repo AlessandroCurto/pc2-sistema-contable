@@ -82,8 +82,8 @@ ESTANDAR: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
     "ventas": ("401", "Ventas", TipoCuenta.INGRESO, Rubro.VENTAS),
     "arriendo": ("501", "Gastos de Arriendo", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
     "costo_ventas": ("502", "Costo de Ventas", TipoCuenta.GASTO, Rubro.COSTO_VENTAS),
-    "personal": ("503", "Gastos de Personal", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
-    "servicios": ("504", "Gastos de Servicios", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
+    "personal": ("505", "Gastos de Personal", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
+    "servicios": ("506", "Gastos de Servicios", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
 }
 
 #: Qué cuenta de gasto usar según cómo el enunciado nombre el desembolso.

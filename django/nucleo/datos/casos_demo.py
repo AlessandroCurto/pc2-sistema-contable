@@ -238,7 +238,75 @@ COMERCIALIZADORA_SUR = PlantillaCaso(
     ],
 )
 
-PLANTILLAS_CASO = [CYBERTEC, METROPOLITANA, COMERCIALIZADORA_SUR]
+LOS_ANDES = PlantillaCaso(
+    id="los-andes",
+    nombre="Ferretería Los Andes S.R.L.",
+    descripcion=(
+        "Agosto 2024: inventario inicial, compra al contado con IGV, venta al contado y "
+        "al crédito, sueldos, cobranza a clientes, amortización de deuda y costo de ventas."
+    ),
+    plantilla_cuentas="numerado",
+    razon_social="Ferretería Los Andes S.R.L.",
+    ruc="20100000004",
+    simbolo_moneda="S/",
+    periodo_inicio=date(2024, 8, 1),
+    periodo_fin=date(2024, 8, 31),
+    tasa_impuesto_renta=Decimal("29.5"),
+    impuesto_afecta_patrimonio=True,
+    asientos=[
+        AsientoDemo(
+            fecha=date(2024, 8, 1),
+            glosa="Inventario inicial: efectivo, cuenta corriente, mercaderías, clientes, "
+                  "proveedores y capital",
+            lineas=[
+                _debe("101", 900000),
+                _debe("102", 1500000),
+                _debe("105", 480000),
+                _debe("103", 320000),
+                _haber("201", 500000),
+                _haber("301", 2700000),
+            ],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 8, 2),
+            glosa="Compra de mercaderías a Aceros del Centro S.A. por 354,000 (IGV incluido), "
+                  "pagada con cheque",
+            lineas=[_debe("105", 300000), _debe("106", 54000), _haber("102", 354000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 8, 5),
+            glosa="Venta al contado por 250,000 más IGV, cobrada en efectivo",
+            lineas=[_debe("101", 295000), _haber("401", 250000), _haber("203", 45000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 8, 12),
+            glosa="Venta al crédito a Constructora Huaraz E.I.R.L. por 180,000 más IGV",
+            lineas=[_debe("103", 212400), _haber("401", 180000), _haber("203", 32400)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 8, 15),
+            glosa="Pago de los sueldos del mes con cheque",
+            lineas=[_debe("505", 90000), _haber("102", 90000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 8, 20),
+            glosa="Cobro con cheque de la deuda inicial de clientes",
+            lineas=[_debe("102", 200000), _haber("103", 200000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 8, 25),
+            glosa="Pago con cheque del 60% de la deuda inicial con proveedores",
+            lineas=[_debe("201", 300000), _haber("102", 300000)],
+        ),
+        AsientoDemo(
+            fecha=date(2024, 8, 31),
+            glosa="Costo de ventas por diferencia de inventarios; existencia final 540,000",
+            lineas=[_debe("502", 240000), _haber("105", 240000)],
+        ),
+    ],
+)
+
+PLANTILLAS_CASO = [CYBERTEC, METROPOLITANA, COMERCIALIZADORA_SUR, LOS_ANDES]
 
 OPCIONES_CASO_DEMO = [(plantilla.id, plantilla.nombre) for plantilla in PLANTILLAS_CASO]
 

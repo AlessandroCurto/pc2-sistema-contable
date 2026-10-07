@@ -359,3 +359,48 @@ class AsistenteConEnunciadoTest(TestCase):
             content_type="application/json",
         )
         self.assertEqual(respuesta.status_code, 400)
+
+
+class ElLectorCoincideConElCasoGuardadoTest(TestCase):
+    """Comprobación cruzada: el enunciado de Los Andes, leído por el asistente,
+    tiene que dar exactamente el caso de ejemplo escrito a mano."""
+
+    ENUNCIADO_ANDES = (
+        "La empresa Ferretería Los Andes S.R.L. presenta el siguiente inventario inicial "
+        "al 01 de agosto del 2024: dinero en efectivo S/ 900,000, cuenta corriente "
+        "S/ 1,500,000, Mercaderías S/ 480,000, Clientes S/ 320,000, Proveedores "
+        "S/ 500,000 y capital S/ 2,700,000.\n"
+        "02/08/2024 - Compra de Mercadería: Se compran mercaderías a Aceros del Centro "
+        "S.A. por un total de S/ 354,000.00 (IGV incluido), cancelando con cheque.\n"
+        "05/08/2024 - Venta al contado: Se venden mercaderías por un valor neto de "
+        "S/ 250,000.00 (más IGV). El cliente paga en efectivo.\n"
+        "12/08/2024 - Venta al crédito: Se venden mercaderías a Constructora Huaraz "
+        "E.I.R.L. por un valor neto de S/ 180,000.00 (más IGV), otorgando crédito a 30 días.\n"
+        "15/08/2024 - Gasto de Personal: Se pagan los sueldos del mes por S/ 90,000.00 "
+        "mediante cheque.\n"
+        "20/08/2024 - Cobranza a Clientes: Se cobra con cheque S/ 200,000.00 de la deuda "
+        "histórica que mantenían los clientes del inventario inicial.\n"
+        "25/08/2024 - Amortización de Deuda: Se cancela el 60% de la deuda histórica "
+        "(inventario inicial) que se mantenía con los proveedores, emitiendo un cheque.\n"
+        "31/08/2024 - Ajuste por Costo de Ventas: Al cierre del mes, el conteo físico "
+        "determina una existencia final de mercaderías valorizada en S/ 540,000.00."
+    )
+
+    def test_leerlo_da_los_mismos_movimientos_que_el_caso_de_ejemplo(self):
+        from ..datos.casos_demo import LOS_ANDES, crear_caso_demo
+
+        a_mano = crear_caso_demo(LOS_ANDES)
+        esperado = sorted(
+            (linea.cuenta.codigo, linea.debe, linea.haber)
+            for asiento in a_mano.asientos.all()
+            for linea in asiento.lineas.all()
+        )
+
+        a_mano.asientos.all().delete()
+        lectura = enunciados.leer(self.ENUNCIADO_ANDES, a_mano.a_dominio())
+        leido = sorted(
+            (linea.cuenta.codigo, linea.debe, linea.haber)
+            for asiento in lectura.asientos
+            for linea in asiento.lineas
+        )
+        self.assertEqual(leido, esperado)

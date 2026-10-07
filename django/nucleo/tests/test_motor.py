@@ -8,7 +8,13 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from ..datos.casos_demo import COMERCIALIZADORA_SUR, CYBERTEC, METROPOLITANA, crear_caso_demo
+from ..datos.casos_demo import (
+    COMERCIALIZADORA_SUR,
+    CYBERTEC,
+    LOS_ANDES,
+    METROPOLITANA,
+    crear_caso_demo,
+)
 from ..dominio.balance_comprobacion import construir_balance_comprobacion
 from ..dominio.balance_general import construir_balance_general
 from ..dominio.estado_resultados import construir_estado_resultados
@@ -165,3 +171,72 @@ class ComercializadoraSurTest(TestCase):
         self.assertEqual(general.total_pasivo, Decimal("1214156.20"))
         self.assertEqual(general.resultado_ejercicio, Decimal("100746.17"))
         self.assertEqual(general.total_patrimonio, Decimal("5900746.17"))
+
+
+class FerreteriaLosAndesTest(TestCase):
+    """Ferretería Los Andes S.R.L.: compras y ventas al contado y al crédito,
+    sueldos y cobranza. Las cifras están calculadas a mano una por una."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(LOS_ANDES).a_dominio()
+
+    def test_cada_asiento_cuadra(self):
+        from ..dominio.libro_diario import FiltroDiario, construir_libro_diario
+
+        for item in construir_libro_diario(self.caso, FiltroDiario()).asientos:
+            self.assertTrue(item.cuadrado, item.asiento.glosa)
+
+    def test_balance_de_comprobacion(self):
+        balance = construir_balance_comprobacion(self.caso)
+        self.assertTrue(balance.cuadrado)
+        self.assertEqual(balance.total_debe, Decimal("4891400.00"))
+        self.assertEqual(balance.total_haber, Decimal("4891400.00"))
+
+    def test_los_saldos_del_mayor(self):
+        saldos = {
+            item.cuenta.codigo: item.saldo
+            for grupo in construir_libro_mayor(self.caso).grupos
+            for item in grupo.cuentas
+        }
+        esperados = {
+            "101": "1195000",   # caja: 900,000 + 295,000 de la venta al contado
+            "102": "956000",    # banco: 1,500,000 - 354,000 - 90,000 + 200,000 - 300,000
+            "103": "332400",    # clientes: 320,000 + 212,400 - 200,000
+            "105": "540000",    # mercaderías: 480,000 + 300,000 - 240,000
+            "106": "54000",     # IGV crédito fiscal de la compra
+            "201": "200000",    # proveedores: 500,000 - 60%
+            "203": "77400",     # IGV débito: 45,000 + 32,400
+            "301": "2700000",
+            "401": "430000",    # 250,000 + 180,000
+            "502": "240000",
+            "505": "90000",
+        }
+        for codigo, esperado in esperados.items():
+            self.assertEqual(saldos[codigo], Decimal(esperado), "cuenta " + codigo)
+
+    def test_estado_de_resultados(self):
+        estado = construir_estado_resultados(self.caso)
+        self.assertEqual(estado.ventas_netas, Decimal("430000.00"))
+        self.assertEqual(estado.costo_ventas, Decimal("240000.00"))
+        self.assertEqual(estado.utilidad_bruta, Decimal("190000.00"))
+        self.assertEqual(estado.gasto_administracion, Decimal("90000.00"))
+        self.assertEqual(estado.resultado_antes_impuesto, Decimal("100000.00"))
+        self.assertEqual(estado.tasa_impuesto, Decimal("29.50"))
+        self.assertEqual(estado.impuesto, Decimal("29500.00"))
+        self.assertEqual(estado.utilidad_neta, Decimal("70500.00"))
+
+    def test_balance_general(self):
+        general = construir_balance_general(self.caso)
+        self.assertTrue(general.cuadrado)
+        self.assertEqual(general.total_activo, Decimal("3077400.00"))
+        self.assertEqual(general.total_pasivo, Decimal("306900.00"))
+        self.assertEqual(general.impuesto_por_pagar, Decimal("29500.00"))
+        self.assertEqual(general.total_patrimonio, Decimal("2770500.00"))
+        self.assertTrue(son_iguales(general.total_activo, general.total_pasivo_patrimonio))
+
+    def test_el_patrimonio_lleva_la_utilidad_neta(self):
+        estado = construir_estado_resultados(self.caso)
+        general = construir_balance_general(self.caso)
+        self.assertTrue(general.resultado_neto_de_impuesto)
+        self.assertEqual(general.resultado_ejercicio, estado.utilidad_neta)
