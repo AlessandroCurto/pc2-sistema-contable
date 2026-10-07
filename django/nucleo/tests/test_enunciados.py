@@ -583,3 +583,65 @@ class ElCasoCreadoNaceCompletoTest(TestCase):
             self.PACIFICO + "\nLa empresa aplica un impuesto a la renta del 30%."
         )
         self.assertEqual(caso.tasa_impuesto_renta, Decimal("30.00"))
+
+
+class LaRedaccionNuevaDelEnunciadoTest(TestCase):
+    """El enunciado se reescribió con los importes explícitos. Debe dar lo mismo."""
+
+    REDACTADO = (
+        "La empresa Comercializadora del Sur S.A.C. presenta el siguiente inventario "
+        "inicial al 01 de junio del 2024: dinero en efectivo S/. 2,500,000, cuenta "
+        "corriente S/. 3,500,000, Clientes S/. 600,000, Proveedores S/. 800,000 y "
+        "capital S/. 5,800,000.\n"
+        "01/06/2024 – Compra de Mercadería: Se compran mercaderías a Adelco Ltda. por un "
+        "total de S/ 1,000,000.00 (IGV incluido), fraccionando el pago en 10 letras de "
+        "cambio de igual valor.\n"
+        "02/06/2024 – Venta de Mercadería: Se venden mercaderías a Mario Cea Castro por "
+        "un valor neto de S/ 400,000.00 (más IGV). El cliente cancela el 40% del monto "
+        "total facturado en efectivo y por el saldo acepta 4 letras de cambio "
+        "(N.º 101, 102, 103 y 104).\n"
+        "10/06/2024 – Gasto Operativo: Pago del arriendo mensual de la oficina con "
+        "cheque por S/ 100,000.00.\n"
+        "11/06/2024 – Amortización de Deuda: Pago con cheque del 50% de la deuda inicial "
+        "con proveedores por S/ 400,000.00.\n"
+        "15/06/2024 – Cobranza a Clientes: Cobro con cheque de las letras 101 y 102 de "
+        "Mario Cea Castro por un importe de S/ 141,600.00.\n"
+        "30/06/2024 – Pago de Letras: Pago con cheque de 3 letras a Adelco Ltda. por un "
+        "importe de S/ 300,000.00.\n"
+        "30/06/2024 – Ajuste por Costo de Ventas: Costo de ventas por diferencia de "
+        "inventarios al cierre del mes considerando una existencia final de "
+        "S/ 690,360.00 (asiento registrado por un importe de S/ 157,097.63)."
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.caso = crear_caso_demo(COMERCIALIZADORA_SUR)
+
+    def test_da_el_mismo_caso_que_la_redaccion_anterior(self):
+        a_mano = sorted(
+            (linea.cuenta.codigo, linea.debe, linea.haber)
+            for asiento in self.caso.asientos.all()
+            for linea in asiento.lineas.all()
+        )
+        self.caso.asientos.all().delete()
+        lectura = enunciados.leer(self.REDACTADO, self.caso.a_dominio())
+        self.assertEqual(lectura.problemas, [])
+        leido = sorted(
+            (linea.cuenta.codigo, linea.debe, linea.haber)
+            for asiento in lectura.asientos
+            for linea in asiento.lineas
+        )
+        self.assertEqual(leido, a_mano)
+
+    def test_el_costo_no_se_confunde_con_la_existencia_final(self):
+        """La operación trae dos importes: 690,360 es el inventario, no el costo."""
+        self.caso.asientos.all().delete()
+        lectura = enunciados.leer(self.REDACTADO, self.caso.a_dominio())
+        costo = next(a for a in lectura.asientos if "Costo" in a.glosa)
+        self.assertEqual(costo.total, Decimal("157097.63"))
+
+    def test_el_cobro_con_cheque_va_al_banco(self):
+        self.caso.asientos.all().delete()
+        lectura = enunciados.leer(self.REDACTADO, self.caso.a_dominio())
+        cobro = next(a for a in lectura.asientos if "Cobro" in a.glosa)
+        self.assertEqual([l.cuenta.codigo for l in cobro.lineas if l.debe], ["102"])

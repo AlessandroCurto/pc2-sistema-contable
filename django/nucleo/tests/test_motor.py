@@ -271,3 +271,59 @@ class CobrosConChequeTest(TestCase):
         self.assertEqual(saldos["102"], Decimal("2841600"))   # banco
         # El total no cambia: solo se movió de una cuenta a la otra.
         self.assertEqual(saldos["101"] + saldos["102"], Decimal("5530400"))
+
+
+class LosCincoReportesNoPuedenDiscrepar(TestCase):
+    """Los cinco reportes salen de los mismos asientos, no de copias guardadas.
+
+    Se afirmó que el Libro Mayor podía quedar en una versión vieja mientras el
+    Balance de Comprobación tenía otra. No es posible: nada se almacena
+    calculado. Esta prueba lo deja asentado para los cuatro casos de ejemplo.
+    """
+
+    def _casos(self):
+        from ..datos.casos_demo import PLANTILLAS_CASO
+
+        for plantilla in PLANTILLAS_CASO:
+            yield plantilla.id, crear_caso_demo(plantilla).a_dominio()
+
+    def test_el_mayor_y_el_balance_de_comprobacion_dan_los_mismos_saldos(self):
+        for nombre, caso in self._casos():
+            mayor = {
+                item.cuenta.codigo: item.saldo
+                for grupo in construir_libro_mayor(caso).grupos
+                for item in grupo.cuentas
+            }
+            for fila in construir_balance_comprobacion(caso).filas:
+                with self.subTest(caso=nombre, cuenta=fila.cuenta.codigo):
+                    saldo = fila.saldo_deudor or fila.saldo_acreedor
+                    self.assertEqual(mayor[fila.cuenta.codigo], saldo)
+
+    def test_el_balance_general_usa_esos_mismos_saldos(self):
+        for nombre, caso in self._casos():
+            mayor = {
+                item.cuenta.codigo: item.saldo
+                for grupo in construir_libro_mayor(caso).grupos
+                for item in grupo.cuentas
+            }
+            general = construir_balance_general(caso)
+            bloques = (general.activo_corriente, general.activo_no_corriente,
+                       general.pasivo_corriente, general.pasivo_no_corriente,
+                       general.patrimonio)
+            for bloque in bloques:
+                for detalle in bloque.cuentas:
+                    codigo = detalle.cuenta.codigo
+                    if codigo not in mayor:
+                        continue  # el impuesto por pagar no nace de un asiento
+                    with self.subTest(caso=nombre, cuenta=codigo):
+                        self.assertEqual(detalle.monto, mayor[codigo])
+
+    def test_el_diario_suma_lo_mismo_que_el_balance_de_comprobacion(self):
+        from ..dominio.libro_diario import FiltroDiario, construir_libro_diario
+
+        for nombre, caso in self._casos():
+            with self.subTest(caso=nombre):
+                diario = construir_libro_diario(caso, FiltroDiario())
+                balance = construir_balance_comprobacion(caso)
+                self.assertEqual(diario.total_debe, balance.total_debe)
+                self.assertEqual(diario.total_haber, balance.total_haber)
