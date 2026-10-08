@@ -359,10 +359,13 @@ def _cortar_cierre(bloque: str) -> List[str]:
 
 def _partir(texto: str) -> List[str]:
     """Separa el enunciado en operaciones: una por línea con fecha o viñeta."""
+    # Copiado de una cita (correo, chat, markdown), el texto trae "> " al
+    # inicio de cada línea, o en medio si los saltos de línea se perdieron.
+    texto = re.sub(r"\s+[>»|]\s+", "\n", texto)
     crudas = [
-        trozo.strip(" \t-•*–—")
+        trozo.strip(" \t-•*–—>»|")
         for linea in texto.splitlines()
-        for trozo in _cortar_en_fechas(linea.strip(" \t-•*–—"))
+        for trozo in _cortar_en_fechas(linea.strip(" \t-•*–—>»|"))
     ]
     bloques: List[str] = []
     actual: List[str] = []

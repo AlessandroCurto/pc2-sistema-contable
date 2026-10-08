@@ -781,6 +781,15 @@ class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
         texto = " ".join(self.ENUNCIADO.splitlines())
         self._comprobar(enunciados.leer(texto, enunciados.CASO_VACIO))
 
+    def test_copiado_de_una_cita_con_signos_mayor_que(self):
+        """Así llegó desde el celular: "> " entre operación y operación."""
+        en_una_linea = "Nombre: tres primeros grupos > " + " > ".join(
+            self.ENUNCIADO.splitlines()[1:]
+        )
+        self._comprobar(enunciados.leer(en_una_linea, enunciados.CASO_VACIO))
+        por_lineas = "\n".join("> " + l for l in self.ENUNCIADO.splitlines())
+        self._comprobar(enunciados.leer(por_lineas, enunciados.CASO_VACIO))
+
     def test_con_otro_caso_abierto_lo_registra_aparte(self):
         from ..datos.casos_demo import LOS_ANDES
         from ..models import Caso
