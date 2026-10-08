@@ -52,6 +52,7 @@ PAPELES: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     "caja": (("caja",), ("efectivo",)),
     "banco": (("banco",), ("cuenta corriente",)),
     "clientes": (("clientes",), ("cuentas por cobrar",)),
+    "socios": (("socios",), ("accionistas",)),
     "letras_cobrar": (("letras por cobrar",), ("documentos por cobrar",)),
     "mercaderias": (("mercader",), ("existencias",)),
     "igv_credito": (("igv", "credito"), ("credito fiscal",)),
@@ -80,6 +81,7 @@ ESTANDAR: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
     "caja": ("101", "Caja", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "banco": ("102", "Banco", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "clientes": ("103", "Clientes", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "socios": ("112", "Cuentas por Cobrar a Socios", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "letras_cobrar": ("104", "Letras por Cobrar", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "mercaderias": ("105", "Mercaderías", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "igv_credito": ("106", "IGV Crédito Fiscal", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
@@ -158,6 +160,9 @@ class Plan:
                     if papel == "dep_acumulada" and cuenta.tipo != TipoCuenta.ACTIVO:
                         continue
                     if papel == "proveedores" and "diversas" in nombre:
+                        continue
+                    # Lo que deben los socios no es lo que deben los clientes.
+                    if papel == "clientes" and ("socios" in nombre or "accionistas" in nombre):
                         continue
                     return cuenta
         return None
@@ -636,12 +641,55 @@ def _apertura(texto: str, plan: Plan, memoria: Memoria):
         )
 
     constitucion = any(frase in _plano(texto) for frase in CONSTITUCION)
+    if constitucion:
+        return _constitucion(texto, plan, lineas, explicacion)
     return AsientoPropuesto(
         fecha=_fecha(texto),
-        glosa="Constitución de la empresa" if constitucion else "Inventario inicial",
+        glosa="Inventario inicial",
         lineas=lineas,
         explicacion=explicacion,
     ), None
+
+
+def _constitucion(texto: str, plan: Plan, lineas: List[LineaPropuesta],
+                  explicacion: List[str]):
+    """La empresa que nace se registra en dos asientos, como en el libro.
+
+    Primero los socios se comprometen a aportar (suscriben el capital) y
+    quedan debiéndolo; después lo entregan (lo pagan) en efectivo y en bienes.
+    """
+    capital = plan("capital")
+    socios = plan("socios")
+    if capital is None or socios is None:
+        return None, "faltan las cuentas de capital o de cuentas por cobrar a socios"
+    suscrito = sum((l.haber for l in lineas if l.cuenta == capital), Decimal("0.00"))
+    if suscrito <= 0:
+        return None, "no se pudo saber el capital de la empresa"
+    fecha = _fecha(texto)
+
+    suscripcion = AsientoPropuesto(
+        fecha=fecha,
+        glosa="Constitución: suscripción del capital",
+        lineas=[LineaPropuesta(socios, debe=suscrito), LineaPropuesta(capital, haber=suscrito)],
+        explicacion=[
+            f"Los socios se comprometen a aportar {_n(suscrito)}: nace el capital y, "
+            f"mientras no lo entreguen, lo deben a la empresa ({socios.nombre})."
+        ] + explicacion[1:],
+    )
+    aportes = [l for l in lineas if l.cuenta != capital]
+    aportes.append(LineaPropuesta(socios, haber=suscrito))
+    aporte = AsientoPropuesto(
+        fecha=fecha,
+        glosa="Constitución: aporte de los socios",
+        lineas=aportes,
+        explicacion=[
+            "Lo que entregan entra al Debe: " + "; ".join(
+                f"{l.cuenta.nombre} {_n(l.debe)}" for l in aportes if l.debe
+            ) + f". La deuda de los socios queda en cero: {socios.nombre} va al Haber "
+            f"por {_n(suscrito)}."
+        ],
+    )
+    return [suscripcion, aporte], None
 
 
 def _compra(texto: str, plan: Plan, memoria: Memoria):
@@ -1098,25 +1146,28 @@ def leer(texto: str, caso: CasoDominio, crear_cuentas: bool = True) -> Lectura:
         if tipo is None:
             lectura.problemas.append(f"Operación {numero} ({resumen}): no la reconocí.")
             continue
-        asiento, motivo = CONSTRUCTORES[tipo](bloque, plan, memoria)
-        if asiento is None:
+        resultado, motivo = CONSTRUCTORES[tipo](bloque, plan, memoria)
+        if resultado is None:
             lectura.problemas.append(f"Operación {numero} ({resumen}): {motivo}.")
             continue
-        if not asiento.cuadra:
+        # La constitución da dos asientos; el resto, uno.
+        asientos = resultado if isinstance(resultado, list) else [resultado]
+        if not all(asiento.cuadra for asiento in asientos):
             lectura.problemas.append(
                 f"Operación {numero} ({resumen}): el asiento me salió descuadrado, "
                 "así que no te lo propongo."
             )
             continue
-        if asiento.fecha is None and ultima_fecha:
-            # "y registran gastos de servicios..." es del mismo día que la
-            # línea de arriba; el inventario final y la depreciación, del cierre.
-            asiento.fecha = (
-                _fecha_del_cierre(bloque, ultima_fecha)
-                if tipo in AJUSTES_DE_CIERRE else ultima_fecha
-            )
-        ultima_fecha = asiento.fecha or ultima_fecha
-        lectura.asientos.append(asiento)
+        for asiento in asientos:
+            if asiento.fecha is None and ultima_fecha:
+                # "y registran gastos de servicios..." es del mismo día que la
+                # línea de arriba; el inventario final y la depreciación, del cierre.
+                asiento.fecha = (
+                    _fecha_del_cierre(bloque, ultima_fecha)
+                    if tipo in AJUSTES_DE_CIERRE else ultima_fecha
+                )
+            ultima_fecha = asiento.fecha or ultima_fecha
+            lectura.asientos.append(asiento)
 
     # Solo las cuentas que de verdad usó algún asiento propuesto.
     usadas = {l.cuenta.codigo for a in lectura.asientos for l in a.lineas}
@@ -1146,7 +1197,7 @@ def a_markdown(lectura: Lectura, caso: CasoDominio) -> str:
 
     if lectura.asientos:
         partes.append(
-            f"Leí **{len(lectura.asientos)} operación(es)** y así quedan los asientos:"
+            f"Son **{len(lectura.asientos)} asiento(s)**:"
         )
         for numero, asiento in enumerate(lectura.asientos, start=1):
             fecha = f"{asiento.fecha:%d/%m/%Y}" if asiento.fecha else "sin fecha"
