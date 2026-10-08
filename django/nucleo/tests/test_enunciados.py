@@ -751,13 +751,17 @@ class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
 
     def _comprobar(self, lectura):
         self.assertEqual(lectura.problemas, [])
-        self.assertEqual(len(lectura.asientos), 5)
-        constitucion, compra, venta, gasto, costo = self._montos(lectura)
+        self.assertEqual(len(lectura.asientos), 6)
+        suscripcion, aporte, compra, venta, gasto, costo = self._montos(lectura)
         cero = Decimal("0.00")
 
-        self.assertEqual(constitucion["Caja"], (Decimal("100000"), cero))
-        self.assertEqual(constitucion["Maquinaria y Equipo"], (Decimal("100000"), cero))
-        self.assertEqual(constitucion["Capital"], (cero, Decimal("200000.00")))
+        # La constitución va en dos: los socios suscriben y después aportan.
+        self.assertEqual(suscripcion["Cuentas por Cobrar a Socios"],
+                         (Decimal("200000.00"), cero))
+        self.assertEqual(suscripcion["Capital"], (cero, Decimal("200000.00")))
+        self.assertEqual(aporte["Caja"], (Decimal("100000"), cero))
+        self.assertEqual(aporte["Maquinaria y Equipo"], (Decimal("100000"), cero))
+        self.assertEqual(aporte["Cuentas por Cobrar a Socios"], (cero, Decimal("200000.00")))
 
         self.assertEqual(compra["Mercaderías"], (Decimal("50000"), cero))
         self.assertEqual(compra["Proveedores"], (cero, Decimal("50000.00")))
@@ -771,9 +775,9 @@ class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
 
         self.assertEqual(costo["Costo de Ventas"], (Decimal("25000.00"), cero))
         self.assertEqual(costo["Mercaderías"], (cero, Decimal("25000.00")))
-        self.assertEqual(lectura.asientos[4].fecha.isoformat(), "2026-10-31")
+        self.assertEqual(lectura.asientos[5].fecha.isoformat(), "2026-10-31")
 
-    def test_resuelve_las_cinco_operaciones(self):
+    def test_resuelve_las_cinco_operaciones_en_seis_asientos(self):
         self._comprobar(enunciados.leer(self.ENUNCIADO, enunciados.CASO_VACIO))
 
     def test_pegado_en_una_sola_linea_tambien(self):
@@ -803,14 +807,14 @@ class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
             content_type="application/json",
         ).json()
 
-        self.assertEqual(datos["guardados"], 5)
+        self.assertEqual(datos["guardados"], 6)
         self.assertEqual(datos["errores"], [])
         self.assertEqual(andes.asientos.count(), antes)  # Los Andes, intacto
         nuevo = Caso.objects.exclude(pk=andes.pk).get()
         self.assertEqual(nuevo.periodo_fin.isoformat(), "2026-10-31")
         balance = construir_balance_comprobacion(nuevo.a_dominio())
         self.assertTrue(balance.cuadrado)
-        self.assertEqual(balance.total_debe, Decimal("425000.00"))
+        self.assertEqual(balance.total_debe, Decimal("625000.00"))
 
     def test_el_aviso_dice_que_es_una_empresa_nueva(self):
         from ..datos.casos_demo import LOS_ANDES
@@ -846,13 +850,14 @@ class PlanillaServiciosYDepreciacionTest(TestCase):
 
     def _comprobar(self, lectura):
         self.assertEqual(lectura.problemas, [])
-        self.assertEqual(len(lectura.asientos), 7)
+        self.assertEqual(len(lectura.asientos), 8)
         montos = [
             {l.cuenta.nombre: (l.debe, l.haber) for l in a.lineas} for a in lectura.asientos
         ]
         cero = Decimal("0.00")
+        self.assertEqual(montos.pop(0)["Capital"], (cero, Decimal("300000.00")))  # suscripción
         self.assertEqual(montos[0]["Vehículos"], (Decimal("100000"), cero))
-        self.assertEqual(montos[0]["Capital"], (cero, Decimal("300000.00")))
+        self.assertEqual(montos[0]["Cuentas por Cobrar a Socios"], (cero, Decimal("300000.00")))
         self.assertEqual(montos[1]["Caja"], (cero, Decimal("50000.00")))
         self.assertEqual(montos[1]["Proveedores"], (cero, Decimal("50000.00")))
         self.assertEqual(montos[3]["Gastos de Personal"], (Decimal("50000"), cero))
@@ -862,10 +867,11 @@ class PlanillaServiciosYDepreciacionTest(TestCase):
         self.assertEqual(montos[6]["Gasto por Depreciación"], (Decimal("833.33"), cero))
         self.assertEqual(montos[6]["Depreciación Acumulada"], (cero, Decimal("833.33")))
         fechas = [a.fecha.isoformat() for a in lectura.asientos]
-        self.assertEqual(fechas[4], "2026-10-16")   # el mismo día que la planilla
-        self.assertEqual(fechas[5:], ["2026-10-31", "2026-10-31"])
+        self.assertEqual(fechas[:2], ["2026-10-01", "2026-10-01"])
+        self.assertEqual(fechas[5], "2026-10-16")   # el mismo día que la planilla
+        self.assertEqual(fechas[6:], ["2026-10-31", "2026-10-31"])
 
-    def test_resuelve_las_siete_operaciones(self):
+    def test_son_ocho_asientos(self):
         self._comprobar(enunciados.leer(self.ENUNCIADO, enunciados.CASO_VACIO))
 
     def test_en_una_sola_linea_tambien(self):
@@ -882,11 +888,11 @@ class PlanillaServiciosYDepreciacionTest(TestCase):
             data=json.dumps({"texto": self.ENUNCIADO}),
             content_type="application/json",
         ).json()
-        self.assertEqual(datos["guardados"], 7)
+        self.assertEqual(datos["guardados"], 8)
         self.assertEqual(datos["errores"], [])
         dominio = Caso.objects.get().a_dominio()
         self.assertEqual(construir_balance_comprobacion(dominio).total_debe,
-                         Decimal("710833.33"))
+                         Decimal("1010833.33"))
         resultados = construir_estado_resultados(dominio)
         # 200,000 - 50,000 - 50,000 - 10,000 - 833.33
         self.assertEqual(resultados.resultado_antes_impuesto, Decimal("89166.67"))
