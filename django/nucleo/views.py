@@ -754,7 +754,14 @@ def asistente_registrar(request):
     try:
         with transaction.atomic():
             if creado:
-                caso = Caso.objects.create(**enunciados.datos_del_caso(texto))
+                datos = enunciados.datos_del_caso(texto)
+                # Dos enunciados sin nombre de empresa no deben quedar como dos
+                # casos que se llaman igual: no habría cómo distinguirlos.
+                base, numero = datos["nombre"], 2
+                while Caso.objects.filter(nombre=datos["nombre"]).exists():
+                    datos["nombre"] = datos["razon_social"] = f"{base[:74]} ({numero})"
+                    numero += 1
+                caso = Caso.objects.create(**datos)
 
             lectura = enunciados.leer(texto, caso.a_dominio())
             if not lectura.asientos:

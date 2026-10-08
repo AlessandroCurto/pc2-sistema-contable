@@ -826,3 +826,95 @@ class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
         self.assertEqual(enunciados._importes("con 100,000 al contado"), [Decimal("100000")])
         self.assertEqual(enunciados._importes("letras N.º 101 y 102 por S/ 5,000"),
                          [Decimal("5000")])
+
+
+class PlanillaServiciosYDepreciacionTest(TestCase):
+    """El segundo enunciado: compra mitad al contado, un gasto que se paga el
+    mes siguiente y la depreciación del vehículo al cierre."""
+
+    ENUNCIADO = (
+        'Aquí tienes la transcripción del texto que aparece en el archivo "1000346188.jpg":\n'
+        " * 01/10/2026 Se crea una empresa con 200,000 al contado y 100,000 con un vehiculo\n"
+        " * 06/10/2026 Se compra 100,000 de mercaderia 50% contado y 50% pagadero en 15 "
+        "dias de credito.\n"
+        " * 11/10/2026 Se realiza una venta por 200,000 soles (60% credito y 40% al contado).\n"
+        " * 16/10/2026 Se pagan gastos de planilla por 50,000 soles al contado\n"
+        " * y registran gastos del mes de servicios por 10,000 pagaderos el siguiente mes.\n"
+        " * En el inventario se observa un saldo final de 50,000 soles al cierre del mes.\n"
+        " * La depreciación es de 10% anual. Debe provisionarse al cierre de mes."
+    )
+
+    def _comprobar(self, lectura):
+        self.assertEqual(lectura.problemas, [])
+        self.assertEqual(len(lectura.asientos), 7)
+        montos = [
+            {l.cuenta.nombre: (l.debe, l.haber) for l in a.lineas} for a in lectura.asientos
+        ]
+        cero = Decimal("0.00")
+        self.assertEqual(montos[0]["Vehículos"], (Decimal("100000"), cero))
+        self.assertEqual(montos[0]["Capital"], (cero, Decimal("300000.00")))
+        self.assertEqual(montos[1]["Caja"], (cero, Decimal("50000.00")))
+        self.assertEqual(montos[1]["Proveedores"], (cero, Decimal("50000.00")))
+        self.assertEqual(montos[3]["Gastos de Personal"], (Decimal("50000"), cero))
+        self.assertEqual(montos[4]["Gastos de Servicios"], (Decimal("10000"), cero))
+        self.assertEqual(montos[4]["Cuentas por Pagar Diversas"], (cero, Decimal("10000.00")))
+        self.assertEqual(montos[5]["Costo de Ventas"], (Decimal("50000.00"), cero))
+        self.assertEqual(montos[6]["Gasto por Depreciación"], (Decimal("833.33"), cero))
+        self.assertEqual(montos[6]["Depreciación Acumulada"], (cero, Decimal("833.33")))
+        fechas = [a.fecha.isoformat() for a in lectura.asientos]
+        self.assertEqual(fechas[4], "2026-10-16")   # el mismo día que la planilla
+        self.assertEqual(fechas[5:], ["2026-10-31", "2026-10-31"])
+
+    def test_resuelve_las_siete_operaciones(self):
+        self._comprobar(enunciados.leer(self.ENUNCIADO, enunciados.CASO_VACIO))
+
+    def test_en_una_sola_linea_tambien(self):
+        texto = " ".join(l.strip(" *") for l in self.ENUNCIADO.splitlines())
+        self._comprobar(enunciados.leer(texto, enunciados.CASO_VACIO))
+
+    def test_registrado_los_reportes_cuadran(self):
+        from ..dominio.balance_general import construir_balance_general
+        from ..dominio.estado_resultados import construir_estado_resultados
+        from ..models import Caso
+
+        datos = self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": self.ENUNCIADO}),
+            content_type="application/json",
+        ).json()
+        self.assertEqual(datos["guardados"], 7)
+        self.assertEqual(datos["errores"], [])
+        dominio = Caso.objects.get().a_dominio()
+        self.assertEqual(construir_balance_comprobacion(dominio).total_debe,
+                         Decimal("710833.33"))
+        resultados = construir_estado_resultados(dominio)
+        # 200,000 - 50,000 - 50,000 - 10,000 - 833.33
+        self.assertEqual(resultados.resultado_antes_impuesto, Decimal("89166.67"))
+        balance = construir_balance_general(dominio)
+        self.assertTrue(balance.cuadrado, balance.diferencia)
+
+        # La depreciación acumulada es un activo en negativo: ninguna pantalla
+        # ni reporte debe romperse por eso.
+        for ruta in ("libro_diario", "libro_mayor", "balance_comprobacion",
+                     "estado_resultados", "balance_general", "reporte", "reporte_excel"):
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.client.get(reverse(ruta)).status_code, 200)
+        from ..forms import ReporteForm
+        from ..servicios.pdf import generar_reporte_pdf
+
+        secciones = [clave for clave, _ in ReporteForm.base_fields["secciones"].choices]
+        self.assertTrue(generar_reporte_pdf(dominio, secciones, "").startswith(b"%PDF"))
+
+    def test_dos_casos_sin_nombre_no_se_llaman_igual(self):
+        from ..models import Caso
+
+        for _ in range(2):
+            self.client.post(
+                reverse("asistente_registrar"),
+                data=json.dumps({"texto": self.ENUNCIADO}),
+                content_type="application/json",
+            )
+        self.assertEqual(
+            sorted(Caso.objects.values_list("nombre", flat=True)),
+            ["Caso del enunciado", "Caso del enunciado (2)"],
+        )
