@@ -292,15 +292,15 @@ class AsistenteConEnunciadoTest(TestCase):
             content_type="application/json",
         )
         datos = respuesta.json()
-        self.assertEqual(datos["guardados"], 8)
+        self.assertEqual(datos["guardados"], 9)
         self.assertEqual(datos["caso"], "Comercializadora del Sur S.A.C.")
         caso = Caso.objects.get()
-        self.assertEqual(caso.asientos.count(), 8)
+        self.assertEqual(caso.asientos.count(), 9)
         self.assertEqual(caso.periodo_inicio.isoformat(), "2024-06-01")
         self.assertEqual(caso.periodo_fin.isoformat(), "2024-06-30")
         balance = construir_balance_comprobacion(caso.a_dominio())
         self.assertTrue(balance.cuadrado)
-        self.assertEqual(balance.total_debe, Decimal("9170697.63"))
+        self.assertEqual(balance.total_debe, Decimal("10018155.26"))
 
     def test_completa_las_cuentas_que_le_faltan_al_plan(self):
         """CYBERTEC usa el PCGE: no tiene letras ni cuentas de IGV.
@@ -324,10 +324,10 @@ class AsistenteConEnunciadoTest(TestCase):
         )
         datos = respuesta.json()
         self.assertEqual(datos["caso"], "")            # no creó otro caso
-        self.assertEqual(datos["guardados"], 8)
+        self.assertEqual(datos["guardados"], 9)
         self.assertGreater(datos["cuentas"], 0)
         self.assertGreater(caso.cuentas.count(), antes)
-        self.assertTrue(caso.cuentas.filter(nombre="Letras por Cobrar").exists())
+        self.assertTrue(caso.cuentas.filter(nombre="Letras por cobrar").exists())
         balance = construir_balance_comprobacion(caso.a_dominio())
         self.assertTrue(balance.cuadrado)
 
@@ -342,11 +342,11 @@ class AsistenteConEnunciadoTest(TestCase):
         )
         caso = Caso.objects.get()
         tipos = {c.nombre: c.tipo for c in caso.cuentas.all()}
-        self.assertEqual(tipos["Letras por Pagar"], "PASIVO")
-        self.assertEqual(tipos["IGV Crédito Fiscal"], "ACTIVO")
+        self.assertEqual(tipos["Letras por pagar"], "PASIVO")
+        self.assertEqual(tipos["Tributos por pagar"], "PASIVO")
         self.assertEqual(tipos["Capital"], "PATRIMONIO")
         self.assertEqual(tipos["Ventas"], "INGRESO")
-        self.assertEqual(tipos["Costo de Ventas"], "GASTO")
+        self.assertEqual(tipos["Costo de ventas"], "GASTO")
 
     def test_el_chat_ofrece_registrar(self):
         caso = crear_caso_demo(COMERCIALIZADORA_SUR)
@@ -471,7 +471,7 @@ class NoMezclarDosEmpresasTest(TestCase):
         self.assertEqual(datos["caso"], "Comercial Pacífico S.A.C.")
         self.assertEqual(self.caso.asientos.count(), antes)  # intacto
         nuevo = Caso.objects.get(nombre="Comercial Pacífico S.A.C.")
-        self.assertEqual(nuevo.asientos.count(), 3)
+        self.assertEqual(nuevo.asientos.count(), 4)  # la compra va en dos
         self.assertEqual(Caso.objects.count(), 2)
 
     def test_el_caso_nuevo_queda_abierto(self):
@@ -657,7 +657,7 @@ class GenerarUnCasoTest(TestCase):
             with self.subTest(semilla=semilla):
                 caso = generador.generar(semilla=semilla)
                 self.assertIsNotNone(caso, "no logró generar con esa semilla")
-                self.assertEqual(caso.asientos, 8)
+                self.assertEqual(caso.asientos, 9)
                 self.assertGreater(caso.utilidad_neta, 0)
 
     def test_lo_que_genera_lo_sabe_leer(self):
@@ -669,7 +669,7 @@ class GenerarUnCasoTest(TestCase):
                 caso = generador.generar(semilla=semilla)
                 lectura = enunciados.leer(caso.enunciado, enunciados.CASO_VACIO)
                 self.assertEqual(lectura.problemas, [])
-                self.assertEqual(len(lectura.asientos), 8)
+                self.assertEqual(len(lectura.asientos), 9)
                 for asiento in lectura.asientos:
                     self.assertTrue(asiento.cuadra, asiento.glosa)
 
@@ -724,11 +724,20 @@ class GenerarUnCasoTest(TestCase):
             content_type="application/json",
         )
         datos = respuesta.json()
-        self.assertEqual(datos["guardados"], 8)
+        self.assertEqual(datos["guardados"], generado.asientos)
         self.assertEqual(datos["errores"], [])
         balance = construir_balance_comprobacion(Caso.objects.get().a_dominio())
         self.assertTrue(balance.cuadrado)
         self.assertEqual(balance.total_debe, generado.total_debe)
+
+
+def asientos_por_codigo(lectura):
+    """Cada asiento como {código: (debe, haber)}, para compararlo de un vistazo."""
+    return [
+        {l.cuenta.codigo: (f"{l.debe.normalize():f}", f"{l.haber.normalize():f}")
+         for l in asiento.lineas}
+        for asiento in lectura.asientos
+    ]
 
 
 class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
@@ -743,38 +752,18 @@ class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
         "En el inventario se observa un saldo final de 25,000 soles al cierre del mes."
     )
 
-    def _montos(self, lectura):
-        return [
-            {l.cuenta.nombre: (l.debe, l.haber) for l in asiento.lineas}
-            for asiento in lectura.asientos
-        ]
-
     def _comprobar(self, lectura):
         self.assertEqual(lectura.problemas, [])
-        self.assertEqual(len(lectura.asientos), 6)
-        suscripcion, aporte, compra, venta, gasto, costo = self._montos(lectura)
-        cero = Decimal("0.00")
-
-        # La constitución va en dos: los socios suscriben y después aportan.
-        self.assertEqual(suscripcion["Cuentas por Cobrar a Socios"],
-                         (Decimal("200000.00"), cero))
-        self.assertEqual(suscripcion["Capital"], (cero, Decimal("200000.00")))
-        self.assertEqual(aporte["Caja"], (Decimal("100000"), cero))
-        self.assertEqual(aporte["Maquinaria y Equipo"], (Decimal("100000"), cero))
-        self.assertEqual(aporte["Cuentas por Cobrar a Socios"], (cero, Decimal("200000.00")))
-
-        self.assertEqual(compra["Mercaderías"], (Decimal("50000"), cero))
-        self.assertEqual(compra["Proveedores"], (cero, Decimal("50000.00")))
-
-        self.assertEqual(venta["Caja"], (Decimal("40000.00"), cero))
-        self.assertEqual(venta["Clientes"], (Decimal("60000.00"), cero))
-        self.assertEqual(venta["Ventas"], (cero, Decimal("100000")))
-
-        self.assertEqual(gasto["Gastos Operativos"], (Decimal("50000"), cero))
-        self.assertEqual(gasto["Caja"], (cero, Decimal("50000.00")))
-
-        self.assertEqual(costo["Costo de Ventas"], (Decimal("25000.00"), cero))
-        self.assertEqual(costo["Mercaderías"], (cero, Decimal("25000.00")))
+        # Con los códigos del PCGE, como en la teoría del curso. La compra se
+        # registra en dos: la 60 Compras y el ingreso al almacén (20 contra 61).
+        self.assertEqual(asientos_por_codigo(lectura), [
+            {"10": ("100000", "0"), "33": ("100000", "0"), "50": ("0", "200000")},
+            {"60": ("50000", "0"), "42": ("0", "50000")},
+            {"20": ("50000", "0"), "61": ("0", "50000")},
+            {"10": ("40000", "0"), "12": ("60000", "0"), "70": ("0", "100000")},
+            {"65": ("50000", "0"), "10": ("0", "50000")},
+            {"69": ("25000", "0"), "20": ("0", "25000")},
+        ])
         self.assertEqual(lectura.asientos[5].fecha.isoformat(), "2026-10-31")
 
     def test_resuelve_las_cinco_operaciones_en_seis_asientos(self):
@@ -814,7 +803,7 @@ class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
         self.assertEqual(nuevo.periodo_fin.isoformat(), "2026-10-31")
         balance = construir_balance_comprobacion(nuevo.a_dominio())
         self.assertTrue(balance.cuadrado)
-        self.assertEqual(balance.total_debe, Decimal("625000.00"))
+        self.assertEqual(balance.total_debe, Decimal("475000.00"))
 
     def test_el_aviso_dice_que_es_una_empresa_nueva(self):
         from ..datos.casos_demo import LOS_ANDES
@@ -850,24 +839,24 @@ class PlanillaServiciosYDepreciacionTest(TestCase):
 
     def _comprobar(self, lectura):
         self.assertEqual(lectura.problemas, [])
-        self.assertEqual(len(lectura.asientos), 8)
-        montos = [
-            {l.cuenta.nombre: (l.debe, l.haber) for l in a.lineas} for a in lectura.asientos
-        ]
-        cero = Decimal("0.00")
-        self.assertEqual(montos.pop(0)["Capital"], (cero, Decimal("300000.00")))  # suscripción
-        self.assertEqual(montos[0]["Vehículos"], (Decimal("100000"), cero))
-        self.assertEqual(montos[0]["Cuentas por Cobrar a Socios"], (cero, Decimal("300000.00")))
-        self.assertEqual(montos[1]["Caja"], (cero, Decimal("50000.00")))
-        self.assertEqual(montos[1]["Proveedores"], (cero, Decimal("50000.00")))
-        self.assertEqual(montos[3]["Gastos de Personal"], (Decimal("50000"), cero))
-        self.assertEqual(montos[4]["Gastos de Servicios"], (Decimal("10000"), cero))
-        self.assertEqual(montos[4]["Cuentas por Pagar Diversas"], (cero, Decimal("10000.00")))
-        self.assertEqual(montos[5]["Costo de Ventas"], (Decimal("50000.00"), cero))
-        self.assertEqual(montos[6]["Gasto por Depreciación"], (Decimal("833.33"), cero))
-        self.assertEqual(montos[6]["Depreciación Acumulada"], (cero, Decimal("833.33")))
+        self.assertEqual(asientos_por_codigo(lectura), [
+            # 1. Constitución: un solo asiento, lo que aportan contra el capital.
+            {"10": ("200000", "0"), "33": ("100000", "0"), "50": ("0", "300000")},
+            # 2 y 3. Compra 50% contado y 50% crédito, y su ingreso al almacén.
+            {"60": ("100000", "0"), "10": ("0", "50000"), "42": ("0", "50000")},
+            {"20": ("100000", "0"), "61": ("0", "100000")},
+            # 4. Venta 40% contado y 60% crédito.
+            {"10": ("80000", "0"), "12": ("120000", "0"), "70": ("0", "200000")},
+            # 5 y 6. Planilla pagada y servicios por pagar el mes siguiente.
+            {"62": ("50000", "0"), "10": ("0", "50000")},
+            {"63": ("10000", "0"), "46": ("0", "10000")},
+            # 7. Costo de ventas: 100,000 que entraron - 50,000 que quedan.
+            {"69": ("50000", "0"), "20": ("0", "50000")},
+            # 8. Depreciación de un mes: 100,000 x 10% / 12.
+            {"68": ("833.33", "0"), "39": ("0", "833.33")},
+        ])
         fechas = [a.fecha.isoformat() for a in lectura.asientos]
-        self.assertEqual(fechas[:2], ["2026-10-01", "2026-10-01"])
+        self.assertEqual(fechas[:3], ["2026-10-01", "2026-10-06", "2026-10-06"])
         self.assertEqual(fechas[5], "2026-10-16")   # el mismo día que la planilla
         self.assertEqual(fechas[6:], ["2026-10-31", "2026-10-31"])
 
@@ -892,7 +881,7 @@ class PlanillaServiciosYDepreciacionTest(TestCase):
         self.assertEqual(datos["errores"], [])
         dominio = Caso.objects.get().a_dominio()
         self.assertEqual(construir_balance_comprobacion(dominio).total_debe,
-                         Decimal("1010833.33"))
+                         Decimal("810833.33"))
         resultados = construir_estado_resultados(dominio)
         # 200,000 - 50,000 - 50,000 - 10,000 - 833.33
         self.assertEqual(resultados.resultado_antes_impuesto, Decimal("89166.67"))

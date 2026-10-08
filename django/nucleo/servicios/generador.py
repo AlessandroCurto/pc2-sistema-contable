@@ -2,7 +2,7 @@
 
 No escribe los asientos: escribe el **enunciado**, y después lo pasa por el
 mismo lector que usa el chat (`servicios/enunciados.py`). Si de ahí no salen
-ocho asientos cuadrados y con utilidad positiva, el enunciado se descarta y se
+sus nueve asientos cuadrados y con utilidad positiva, el enunciado se descarta y se
 genera otro. Así lo que se entrega siempre se puede resolver, y se resuelve con
 el código que ya está probado, no con una copia aparte.
 """
@@ -20,6 +20,9 @@ from ..dominio.estado_resultados import construir_estado_resultados
 from . import enunciados
 
 IGV = Decimal("1.18")
+
+#: Ocho operaciones; la compra, con el PCGE, da dos asientos.
+ASIENTOS = 9
 
 PREFIJOS = ("Comercial", "Distribuidora", "Importadora", "Corporación", "Negocios",
             "Inversiones", "Grupo", "Representaciones", "Almacenes", "Multiservicios")
@@ -139,7 +142,8 @@ def _texto(azar: random.Random) -> str:
 def generar(semilla: Optional[int] = None, intentos: int = 40) -> Optional[CasoGenerado]:
     """Un caso nuevo que el lector resuelve entero y deja con utilidad.
 
-    Se comprueba antes de entregarlo: ocho asientos, ninguno descuadrado, el
+    Se comprueba antes de entregarlo: nueve asientos (las ocho operaciones, y la
+    compra en dos: 60 Compras e ingreso al almacén), ninguno descuadrado, el
     balance de comprobación cerrado y un resultado positivo. Si no sale, se
     intenta con otro.
     """
@@ -147,7 +151,7 @@ def generar(semilla: Optional[int] = None, intentos: int = 40) -> Optional[CasoG
     for _ in range(intentos):
         texto = _texto(azar)
         lectura = enunciados.leer(texto, enunciados.CASO_VACIO)
-        if lectura.problemas or len(lectura.asientos) != 8:
+        if lectura.problemas or len(lectura.asientos) != ASIENTOS:
             continue
         if not all(asiento.cuadra for asiento in lectura.asientos):
             continue

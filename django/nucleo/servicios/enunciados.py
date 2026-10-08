@@ -50,13 +50,12 @@ def _n(valor: Decimal) -> str:
 #: Qué palabras identifican a cada cuenta que el lector necesita.
 PAPELES: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     "caja": (("caja",), ("efectivo",)),
-    "banco": (("banco",), ("cuenta corriente",)),
+    "banco": (("banco",), ("cuenta corriente",), ("cuentas corrientes",)),
     "clientes": (("clientes",), ("cuentas por cobrar",)),
-    "socios": (("socios",), ("accionistas",)),
     "letras_cobrar": (("letras por cobrar",), ("documentos por cobrar",)),
     "mercaderias": (("mercader",), ("existencias",)),
-    "igv_credito": (("igv", "credito"), ("credito fiscal",)),
-    "igv_debito": (("igv", "debito"), ("debito fiscal",)),
+    "igv_credito": (("igv", "credito"), ("credito fiscal",), ("tributos",)),
+    "igv_debito": (("igv", "debito"), ("debito fiscal",), ("tributos",)),
     "proveedores": (("proveedores",), ("cuentas por pagar",)),
     "letras_pagar": (("letras por pagar",), ("documentos por pagar",)),
     "capital": (("capital",),),
@@ -71,17 +70,72 @@ PAPELES: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     "vehiculos": (("vehiculo",), ("unidades de transporte",)),
     "inmuebles": (("inmueble",), ("edificio",), ("terreno",)),
     "por_pagar": (("por pagar diversas",), ("servicios por pagar",), ("otras cuentas por pagar",)),
-    "depreciacion": (("depreciacion",),),
+    "depreciacion": (("depreciacion",), ("valuacion y deterioro",)),
+    "compras": (("compras",),),
+    "variacion": (("variacion de existencias",),),
     "dep_acumulada": (("depreciacion acumulada",), ("depreciacion", "amortizacion", "acumulad")),
 }
 
+#: Cuentas de resultado: el nombre de una cuenta de balance no debe confundirlas
+#: ("Cuentas por cobrar al personal" no es "Gastos de personal").
+PAPELES_DE_GASTO = ("arriendo", "personal", "servicios", "operativos", "depreciacion",
+                    "costo_ventas", "compras", "variacion")
+
 #: Si al plan de cuentas le falta una de estas, el asistente la puede crear.
-#: Los códigos son los del plan "numerado", que es el de estos enunciados.
-ESTANDAR: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
+#: Los códigos son los del Plan Contable General Empresarial, como en la teoría
+#: del curso (10 Efectivo, 12 Cuentas por cobrar comerciales, 20 Mercaderías,
+#: 33 Inmuebles, maquinaria y equipo, 42 Cuentas por pagar comerciales, 50
+#: Capital, 60 Compras, 69 Costo de ventas, 70 Ventas...).
+#: Las cuentas que comparten código (todo el activo fijo va a la 33, los dos
+#: lados del IGV a la 40) son una sola cuenta.
+ESTANDAR_PCGE: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
+    "caja": ("10", "Efectivo y equivalentes de efectivo", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "banco": ("104", "Cuentas corrientes en instituciones financieras", TipoCuenta.ACTIVO,
+              Rubro.CORRIENTE),
+    "clientes": ("12", "Cuentas por cobrar comerciales - terceros", TipoCuenta.ACTIVO,
+                 Rubro.CORRIENTE),
+    "letras_cobrar": ("123", "Letras por cobrar", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "mercaderias": ("20", "Mercaderías", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "maquinaria": ("33", "Inmuebles, maquinaria y equipo", TipoCuenta.ACTIVO,
+                   Rubro.NO_CORRIENTE),
+    "muebles": ("33", "Inmuebles, maquinaria y equipo", TipoCuenta.ACTIVO, Rubro.NO_CORRIENTE),
+    "vehiculos": ("33", "Inmuebles, maquinaria y equipo", TipoCuenta.ACTIVO,
+                  Rubro.NO_CORRIENTE),
+    "inmuebles": ("33", "Inmuebles, maquinaria y equipo", TipoCuenta.ACTIVO,
+                  Rubro.NO_CORRIENTE),
+    # Cuenta de valuación: es activo, pero su saldo es acreedor y resta.
+    "dep_acumulada": ("39", "Depreciación, amortización y agotamiento acumulados",
+                      TipoCuenta.ACTIVO, Rubro.NO_CORRIENTE),
+    "igv_credito": ("40", "Tributos por pagar", TipoCuenta.PASIVO, Rubro.CORRIENTE),
+    "igv_debito": ("40", "Tributos por pagar", TipoCuenta.PASIVO, Rubro.CORRIENTE),
+    "proveedores": ("42", "Cuentas por pagar comerciales - terceros", TipoCuenta.PASIVO,
+                    Rubro.CORRIENTE),
+    "letras_pagar": ("423", "Letras por pagar", TipoCuenta.PASIVO, Rubro.CORRIENTE),
+    "por_pagar": ("46", "Cuentas por pagar diversas - terceros", TipoCuenta.PASIVO,
+                  Rubro.CORRIENTE),
+    "capital": ("50", "Capital", TipoCuenta.PATRIMONIO, None),
+    "compras": ("60", "Compras", TipoCuenta.GASTO, Rubro.COSTO_VENTAS),
+    # Saldo acreedor: devuelve lo comprado al costo cuando entra al almacén.
+    "variacion": ("61", "Variación de existencias", TipoCuenta.GASTO, Rubro.COSTO_VENTAS),
+    "personal": ("62", "Gastos de personal, directores y gerentes", TipoCuenta.GASTO,
+                 Rubro.GASTO_ADMINISTRACION),
+    "servicios": ("63", "Gastos de servicios prestados por terceros", TipoCuenta.GASTO,
+                  Rubro.GASTO_ADMINISTRACION),
+    "arriendo": ("635", "Alquileres", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
+    "operativos": ("65", "Otros gastos de gestión", TipoCuenta.GASTO,
+                   Rubro.GASTO_ADMINISTRACION),
+    "depreciacion": ("68", "Valuación y deterioro de activos y provisiones", TipoCuenta.GASTO,
+                     Rubro.GASTO_ADMINISTRACION),
+    "costo_ventas": ("69", "Costo de ventas", TipoCuenta.GASTO, Rubro.COSTO_VENTAS),
+    "ventas": ("70", "Ventas", TipoCuenta.INGRESO, Rubro.VENTAS),
+}
+
+#: Los mismos papeles en el plan "numerado" (101 Caja, 105 Mercaderías...), el
+#: de los casos de ejemplo: a un caso con ese plan no se le mezclan códigos.
+ESTANDAR_NUMERADO: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
     "caja": ("101", "Caja", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "banco": ("102", "Banco", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "clientes": ("103", "Clientes", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
-    "socios": ("112", "Cuentas por Cobrar a Socios", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "letras_cobrar": ("104", "Letras por Cobrar", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "mercaderias": ("105", "Mercaderías", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "igv_credito": ("106", "IGV Crédito Fiscal", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
@@ -130,6 +184,9 @@ PARTIDAS_APERTURA: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
 )
 
 
+MARCAS_NUMERADO = {"101", "102", "105", "201", "301", "401"}
+
+
 class Plan:
     """Encuentra, en el plan de cuentas del caso, la cuenta de cada papel.
 
@@ -143,6 +200,9 @@ class Plan:
         self.crear = crear
         self.nuevas: Dict[str, Cuenta] = {}
         self._cache: Dict[str, Optional[Cuenta]] = {}
+        # Un caso que ya usa el plan "numerado" (101 Caja, 105 Mercaderías...)
+        # sigue con él; todo lo demás, incluido el caso nuevo, va con el PCGE.
+        self.pcge = not any(c.codigo in MARCAS_NUMERADO for c in caso.cuentas)
 
     def _buscar(self, papel: str) -> Optional[Cuenta]:
         for grupo in PAPELES.get(papel, ()):
@@ -161,8 +221,11 @@ class Plan:
                         continue
                     if papel == "proveedores" and "diversas" in nombre:
                         continue
-                    # Lo que deben los socios no es lo que deben los clientes.
-                    if papel == "clientes" and ("socios" in nombre or "accionistas" in nombre):
+                    # Lo que deben los socios o el personal no es lo que deben los clientes.
+                    if papel == "clientes" and ("accionistas" in nombre or "personal" in nombre):
+                        continue
+                    # "Gastos de personal" no es "Cuentas por cobrar al personal".
+                    if papel in PAPELES_DE_GASTO and cuenta.tipo != TipoCuenta.GASTO:
                         continue
                     return cuenta
         return None
@@ -183,8 +246,15 @@ class Plan:
         if papel in self._cache:
             return self._cache[papel]
         encontrada = self._buscar(papel)
-        if encontrada is None and self.crear and papel in ESTANDAR:
-            codigo, nombre, tipo, rubro = ESTANDAR[papel]
+        estandar = ESTANDAR_PCGE if self.pcge else ESTANDAR_NUMERADO
+        if encontrada is None and self.crear and papel in estandar:
+            codigo, nombre, tipo, rubro = estandar[papel]
+            # Otro papel con el mismo código ya la tiene: es la misma cuenta.
+            misma = next((c for c in list(self.caso.cuentas) + list(self.nuevas.values())
+                          if c.codigo == codigo), None)
+            if misma is not None:
+                self._cache[papel] = misma
+                return misma
             encontrada = Cuenta(
                 id="nueva:" + papel,
                 codigo=self._codigo_libre(codigo),
@@ -641,55 +711,12 @@ def _apertura(texto: str, plan: Plan, memoria: Memoria):
         )
 
     constitucion = any(frase in _plano(texto) for frase in CONSTITUCION)
-    if constitucion:
-        return _constitucion(texto, plan, lineas, explicacion)
     return AsientoPropuesto(
         fecha=_fecha(texto),
-        glosa="Inventario inicial",
+        glosa="Constitución de la empresa" if constitucion else "Inventario inicial",
         lineas=lineas,
         explicacion=explicacion,
     ), None
-
-
-def _constitucion(texto: str, plan: Plan, lineas: List[LineaPropuesta],
-                  explicacion: List[str]):
-    """La empresa que nace se registra en dos asientos, como en el libro.
-
-    Primero los socios se comprometen a aportar (suscriben el capital) y
-    quedan debiéndolo; después lo entregan (lo pagan) en efectivo y en bienes.
-    """
-    capital = plan("capital")
-    socios = plan("socios")
-    if capital is None or socios is None:
-        return None, "faltan las cuentas de capital o de cuentas por cobrar a socios"
-    suscrito = sum((l.haber for l in lineas if l.cuenta == capital), Decimal("0.00"))
-    if suscrito <= 0:
-        return None, "no se pudo saber el capital de la empresa"
-    fecha = _fecha(texto)
-
-    suscripcion = AsientoPropuesto(
-        fecha=fecha,
-        glosa="Constitución: suscripción del capital",
-        lineas=[LineaPropuesta(socios, debe=suscrito), LineaPropuesta(capital, haber=suscrito)],
-        explicacion=[
-            f"Los socios se comprometen a aportar {_n(suscrito)}: nace el capital y, "
-            f"mientras no lo entreguen, lo deben a la empresa ({socios.nombre})."
-        ] + explicacion[1:],
-    )
-    aportes = [l for l in lineas if l.cuenta != capital]
-    aportes.append(LineaPropuesta(socios, haber=suscrito))
-    aporte = AsientoPropuesto(
-        fecha=fecha,
-        glosa="Constitución: aporte de los socios",
-        lineas=aportes,
-        explicacion=[
-            "Lo que entregan entra al Debe: " + "; ".join(
-                f"{l.cuenta.nombre} {_n(l.debe)}" for l in aportes if l.debe
-            ) + f". La deuda de los socios queda en cero: {socios.nombre} va al Haber "
-            f"por {_n(suscrito)}."
-        ],
-    )
-    return [suscripcion, aporte], None
 
 
 def _compra(texto: str, plan: Plan, memoria: Memoria):
@@ -700,15 +727,19 @@ def _compra(texto: str, plan: Plan, memoria: Memoria):
     base, igv, explico = _separar_igv(texto, total)
     con_igv = _r(base + igv)
 
-    cuentas, faltan = plan.exige("mercaderias")
+    # Con el PCGE la compra se carga a la 60 Compras y, cuando la mercadería
+    # entra al almacén, pasa a la 20 contra la 61 Variación de existencias.
+    # En el plan numerado se carga directo a Mercaderías.
+    papeles = ("compras", "mercaderias", "variacion") if plan.pcge else ("mercaderias",)
+    cuentas, faltan = plan.exige(*papeles)
     if faltan:
         return None, "falta la cuenta de " + ", ".join(faltan)
-    mercaderias = cuentas[0]
+    cargo = cuentas[0]
     contra, forma = _forma_de_pago(texto, plan)
     if contra is None:
         return None, "falta la cuenta donde registrar el pago (" + forma + ")"
 
-    lineas = [LineaPropuesta(mercaderias, debe=base)]
+    lineas = [LineaPropuesta(cargo, debe=base)]
     if igv > 0:
         cuenta_igv = plan("igv_credito")
         if cuenta_igv is None:
@@ -749,7 +780,21 @@ def _compra(texto: str, plan: Plan, memoria: Memoria):
             f"{_n(memoria.valor_letra_pagar)} cada una."
         )
     memoria.mercaderias += base
-    return AsientoPropuesto(_fecha(texto), "Compra de mercaderías", lineas, explicacion), None
+    compra = AsientoPropuesto(_fecha(texto), "Compra de mercaderías", lineas, explicacion)
+    if not plan.pcge:
+        return compra, None
+
+    _, mercaderias, variacion = cuentas
+    almacen = AsientoPropuesto(
+        _fecha(texto),
+        "Ingreso de la mercadería al almacén",
+        [LineaPropuesta(mercaderias, debe=base), LineaPropuesta(variacion, haber=base)],
+        [f"Lo comprado entra al almacén al costo, sin IGV: {mercaderias.codigo} "
+         f"{mercaderias.nombre} al Debe y {variacion.codigo} {variacion.nombre} al Haber "
+         f"por {_n(base)}. Así la 60 Compras y la 61 se compensan, y el costo lo pone "
+         f"después la 69."],
+    )
+    return [compra, almacen], None
 
 
 PCT_FORMA = re.compile(
@@ -1150,7 +1195,7 @@ def leer(texto: str, caso: CasoDominio, crear_cuentas: bool = True) -> Lectura:
         if resultado is None:
             lectura.problemas.append(f"Operación {numero} ({resumen}): {motivo}.")
             continue
-        # La constitución da dos asientos; el resto, uno.
+        # Con el PCGE la compra da dos asientos (compra e ingreso al almacén).
         asientos = resultado if isinstance(resultado, list) else [resultado]
         if not all(asiento.cuadra for asiento in asientos):
             lectura.problemas.append(
