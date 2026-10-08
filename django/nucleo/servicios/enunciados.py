@@ -64,6 +64,11 @@ PAPELES: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     "arriendo": (("arriendo",), ("alquiler",)),
     "personal": (("personal",), ("sueldos",), ("remuneraciones",)),
     "servicios": (("servicios",),),
+    "operativos": (("gastos operativos",), ("gastos de operacion",)),
+    "maquinaria": (("maquinaria",), ("maquinas",)),
+    "muebles": (("muebles",), ("enseres",)),
+    "vehiculos": (("vehiculo",), ("unidades de transporte",)),
+    "inmuebles": (("inmueble",), ("edificio",), ("terreno",)),
 }
 
 #: Si al plan de cuentas le falta una de estas, el asistente la puede crear.
@@ -75,6 +80,10 @@ ESTANDAR: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
     "letras_cobrar": ("104", "Letras por Cobrar", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "mercaderias": ("105", "Mercaderías", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
     "igv_credito": ("106", "IGV Crédito Fiscal", TipoCuenta.ACTIVO, Rubro.CORRIENTE),
+    "muebles": ("107", "Muebles y Enseres", TipoCuenta.ACTIVO, Rubro.NO_CORRIENTE),
+    "maquinaria": ("108", "Maquinaria y Equipo", TipoCuenta.ACTIVO, Rubro.NO_CORRIENTE),
+    "vehiculos": ("109", "Vehículos", TipoCuenta.ACTIVO, Rubro.NO_CORRIENTE),
+    "inmuebles": ("110", "Inmuebles", TipoCuenta.ACTIVO, Rubro.NO_CORRIENTE),
     "proveedores": ("201", "Proveedores", TipoCuenta.PASIVO, Rubro.CORRIENTE),
     "letras_pagar": ("202", "Letras por Pagar", TipoCuenta.PASIVO, Rubro.CORRIENTE),
     "igv_debito": ("203", "IGV Débito Fiscal", TipoCuenta.PASIVO, Rubro.CORRIENTE),
@@ -84,6 +93,7 @@ ESTANDAR: Dict[str, Tuple[str, str, TipoCuenta, Optional[Rubro]]] = {
     "costo_ventas": ("502", "Costo de Ventas", TipoCuenta.GASTO, Rubro.COSTO_VENTAS),
     "personal": ("505", "Gastos de Personal", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
     "servicios": ("506", "Gastos de Servicios", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
+    "operativos": ("507", "Gastos Operativos", TipoCuenta.GASTO, Rubro.GASTO_ADMINISTRACION),
 }
 
 #: Qué cuenta de gasto usar según cómo el enunciado nombre el desembolso.
@@ -91,15 +101,20 @@ GASTOS = (
     ("personal", ("sueldos", "remuneraciones", "planilla", "personal", "salarios")),
     ("servicios", ("servicios", "luz", "agua", "telefono", "internet", "energia")),
     ("arriendo", ("arriendo", "alquiler")),
+    ("operativos", ("operativo", "de operacion")),
 )
 
 #: Para el asiento de apertura: cómo se nombra cada partida en el enunciado.
 PARTIDAS_APERTURA: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
-    ("caja", ("efectivo", "caja", "dinero")),
+    ("caja", ("efectivo", "caja", "dinero", "contado")),
     ("banco", ("cuenta corriente", "banco")),
     ("clientes", ("clientes",)),
     ("letras_cobrar", ("letras por cobrar",)),
     ("mercaderias", ("mercader", "existencias")),
+    ("maquinaria", ("maquina", "equipo")),
+    ("muebles", ("muebles", "enseres")),
+    ("vehiculos", ("vehiculo", "camion", "camioneta", "unidades de transporte")),
+    ("inmuebles", ("inmueble", "edificio", "terreno")),
     ("proveedores", ("proveedores",)),
     ("letras_pagar", ("letras por pagar",)),
     ("capital", ("capital",)),
@@ -231,7 +246,11 @@ FECHA_LARGA = re.compile(
 )
 PORCENTAJE = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
 CUENTA_LETRAS = re.compile(r"\b(\d{1,3})\s+(?:de\s+(?:las|los)\s+)?letras\b")
-NUMERO_DE_LETRA = re.compile(r"n\s*[.°ºor]*\s*\d+(?:\s*(?:,|y)\s*\d+)*", re.IGNORECASE)
+#: "N.º 101", "Nº 101", "Nro. 101": la marca es obligatoria. Sin ella, la
+#: "n" de "con 100,000" se tomaba por número de letra y el importe se perdía.
+NUMERO_DE_LETRA = re.compile(
+    r"\bn\s*(?:[.°º]+|ro\b\.?|o\.)\s*\d+(?:\s*(?:,|y)\s*\d+)*", re.IGNORECASE
+)
 IMPORTE_CON_MONEDA = re.compile(r"s/\.?\s*(\d[\d\s,]*(?:\.\d+)?)", re.IGNORECASE)
 IMPORTE_SUELTO = re.compile(r"\b(\d{1,3}(?:[,\s]\d{3})+(?:\.\d+)?|\d+\.\d{2})\b")
 
@@ -295,16 +314,64 @@ def _fecha(texto: str) -> Optional[date]:
         return None
 
 
+#: Una fecha a media línea abre otra operación, salvo que la presente una de
+#: estas palabras: "vence el 30/10/2026" es parte de la operación, no otra.
+ANTES_DE_FECHA_INTERNA = ("el", "al", "de", "del", "hasta", "desde", "a", "y",
+                          "para", "vence", "vencen", "vencimiento", "hacia")
+
+
+def _cortar_en_fechas(linea: str) -> List[str]:
+    """Abre una línea nueva antes de cada fecha que empieza una operación.
+
+    Pegado desde el celular, el enunciado llega a veces con dos o tres
+    operaciones en la misma línea.
+    """
+    cortes = [0]
+    for hallada in FECHA.finditer(linea):
+        previo = linea[:hallada.start()].rstrip()
+        if not previo:
+            continue
+        ultima = _plano(previo).split()[-1].strip("(,")
+        if ultima not in ANTES_DE_FECHA_INTERNA:
+            cortes.append(hallada.start())
+    cortes.append(len(linea))
+    return [linea[a:b].strip() for a, b in zip(cortes, cortes[1:]) if linea[a:b].strip()]
+
+
+def _cortar_cierre(bloque: str) -> List[str]:
+    """Separa la oración del inventario final que viene detrás de otra operación.
+
+    "Se pagan gastos... En el inventario se observa un saldo final de 25,000":
+    son dos asientos, y la segunda oración no trae fecha que la separe.
+    """
+    oraciones = re.split(r"(?<=[.;])\s+(?=[A-ZÁÉÍÓÚÑa-z])", bloque)
+    for indice in range(1, len(oraciones)):
+        resto = " ".join(oraciones[indice:])
+        if FECHA.search(oraciones[indice]):
+            continue
+        antes = " ".join(oraciones[:indice])
+        if _es_inventario_final(_plano(resto)) and _clasificar(antes) not in (
+            None, "costo_ventas"
+        ):
+            return [antes, resto]
+    return [bloque]
+
+
 def _partir(texto: str) -> List[str]:
     """Separa el enunciado en operaciones: una por línea con fecha o viñeta."""
-    crudas = [linea.strip(" \t-•*–—") for linea in texto.splitlines()]
+    crudas = [
+        trozo.strip(" \t-•*–—")
+        for linea in texto.splitlines()
+        for trozo in _cortar_en_fechas(linea.strip(" \t-•*–—"))
+    ]
     bloques: List[str] = []
     actual: List[str] = []
     for linea in crudas:
         if not linea:
             continue
         empieza = FECHA.match(linea) or _plano(linea).startswith(
-            ("la empresa", "al inicio", "el inventario", "se constituye")
+            ("la empresa", "al inicio", "el inventario", "se constituye",
+             "en el inventario", "al cierre", "al final del")
         )
         if empieza and actual:
             bloques.append(" ".join(actual))
@@ -313,7 +380,29 @@ def _partir(texto: str) -> List[str]:
             actual.append(linea)
     if actual:
         bloques.append(" ".join(actual))
-    return [b for b in bloques if len(b) > 15]
+    partidos = [parte for bloque in bloques for parte in _cortar_cierre(bloque)]
+    # Un título sin un solo número ("PARA LOS TRES PRIMEROS GRUPOS") no es
+    # una operación: si se dejara, saldría como "no la reconocí".
+    return [b for b in partidos if len(b) > 15 and re.search(r"\d", b)]
+
+
+def _es_inventario_final(plano: str) -> bool:
+    if any(frase in plano for frase in (
+        "existencia final", "existencias finales", "conteo fisico",
+        "diferencia de inventarios", "inventario final",
+    )):
+        return True
+    # "En el inventario se observa un saldo final de 25,000 al cierre del mes."
+    return ("inventario" in plano or "existencias" in plano) and (
+        "saldo final" in plano or "al cierre" in plano or "fin de mes" in plano
+    ) and "inicial" not in plano
+
+
+#: "Se crea una empresa con...": la constitución es el asiento de apertura
+#: aunque traiga solo uno o dos aportes.
+CONSTITUCION = ("se crea una empresa", "se crea la empresa", "se constituye",
+                "constitucion", "se funda", "inicia sus operaciones con",
+                "inicia operaciones con", "los socios aportan", "aporte de los socios")
 
 
 def _clasificar(texto: str) -> Optional[str]:
@@ -326,9 +415,10 @@ def _clasificar(texto: str) -> Optional[str]:
     hay = lambda *frases: any(frase in plano for frase in frases)
 
     # Verbos que nombran la operación sin ambigüedad.
-    if hay("existencia final", "conteo fisico", "costo de ventas",
-           "diferencia de inventarios", "inventario final"):
+    if hay("costo de ventas") or _es_inventario_final(plano):
         return "costo_ventas"
+    if hay(*CONSTITUCION) and _importes(texto):
+        return "apertura"
     if hay("se compran", "compra de mercader", "compra mercader", "se adquieren",
            "adquisicion de mercader"):
         return "compra"
@@ -355,8 +445,9 @@ def _clasificar(texto: str) -> Optional[str]:
         return "amortizacion"
     if cobro:
         return "cobranza"
-    if hay("arriendo", "alquiler", "gasto operativo", "sueldos", "remuneraciones",
-           "publicidad", "servicios basicos", "se paga el"):
+    if hay("arriendo", "alquiler", "gasto operativo", "gastos operativos", "sueldos",
+           "remuneraciones", "publicidad", "servicios basicos", "se paga el",
+           "se pagan gastos", "paga gastos", "gastos de operacion"):
         return "gasto"
 
     # La apertura lista varias partidas con su importe; si hay menos de tres,
@@ -367,6 +458,14 @@ def _clasificar(texto: str) -> Optional[str]:
             return "apertura"
     if hay("proveedores") and hay("paga", "cancela"):
         return "amortizacion"
+
+    # Redacciones más sueltas: "Se compra 50,000 de mercadería", "Se realiza
+    # una venta por 100,000". Van al final para no ganarle a una cobranza o a
+    # un pago que nombran la venta o la compra que liquidan.
+    if re.search(r"\b(?:compra|compran|adquiere|adquieren)\b", plano) and "mercader" in plano:
+        return "compra"
+    if re.search(r"\b(?:una venta|la venta|vende|venden|vendio|vendieron)\b", plano):
+        return "venta"
     return None
 
 
@@ -443,12 +542,29 @@ def _apertura(texto: str, plan: Plan, memoria: Memoria):
                 break
     if not lineas:
         return None, "no se reconoció ninguna partida del inventario inicial"
+
+    explicacion = ["Cada partida va al Debe si es activo y al Haber si es pasivo "
+                   "o patrimonio: " + "; ".join(detalle) + "."]
+    # "Se crea una empresa con 100,000 al contado y 100,000 en máquinas" no
+    # dice el capital: es lo que aportaron los socios, o sea lo que cuadra.
+    debe = sum((l.debe for l in lineas), Decimal("0.00"))
+    haber = sum((l.haber for l in lineas), Decimal("0.00"))
+    capital = plan("capital")
+    tiene_capital = capital is not None and any(l.cuenta == capital for l in lineas)
+    if not tiene_capital and debe > haber and capital is not None:
+        aporte = _r(debe - haber)
+        lineas.append(LineaPropuesta(capital, haber=aporte))
+        explicacion.append(
+            f"El enunciado no dice el capital: es el aporte de los socios, activos - "
+            f"pasivos = {_n(debe)} - {_n(haber)} = {_n(aporte)}."
+        )
+
+    constitucion = any(frase in _plano(texto) for frase in CONSTITUCION)
     return AsientoPropuesto(
         fecha=_fecha(texto),
-        glosa="Inventario inicial",
+        glosa="Constitución de la empresa" if constitucion else "Inventario inicial",
         lineas=lineas,
-        explicacion=["Cada partida va al Debe si es activo y al Haber si es pasivo "
-                     "o patrimonio: " + "; ".join(detalle) + "."],
+        explicacion=explicacion,
     ), None
 
 
@@ -487,6 +603,43 @@ def _compra(texto: str, plan: Plan, memoria: Memoria):
         )
     memoria.mercaderias += base
     return AsientoPropuesto(_fecha(texto), "Compra de mercaderías", lineas, explicacion), None
+
+
+PCT_FORMA = re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*%\s*(?:es\s+|sera\s+|se\s+cobra\s+|a\s+|al\s+|en\s+)?"
+    r"(credito|contado|efectivo)"
+)
+FORMA_PCT = re.compile(
+    r"(credito|contado|efectivo)\s*(?:del?\s+|el\s+|al\s+|por\s+(?:el\s+)?)?"
+    r"(\d+(?:[.,]\d+)?)\s*%"
+)
+
+
+def _n_pct(valor: Decimal) -> str:
+    return f"{valor.normalize():f}"
+
+
+def _reparto_credito_contado(plano: str) -> Optional[Tuple[Decimal, Decimal]]:
+    """(% al crédito, % al contado) de "60% crédito y 40% al contado"."""
+    credito = contado = None
+    pares = [(m.group(1), m.group(2)) for m in PCT_FORMA.finditer(plano)]
+    pares += [(m.group(2), m.group(1)) for m in FORMA_PCT.finditer(plano)]
+    for numero, forma in pares:
+        valor = Decimal(numero.replace(",", "."))
+        if forma == "credito" and credito is None:
+            credito = valor
+        elif forma in ("contado", "efectivo") and contado is None:
+            contado = valor
+    if credito is None and contado is None:
+        return None
+    # "40% al contado y el saldo al crédito": la otra parte es lo que falta.
+    if credito is None:
+        credito = Decimal("100") - contado
+    if contado is None:
+        contado = Decimal("100") - credito
+    if credito + contado != 100 or credito < 0 or contado < 0:
+        return None
+    return credito, contado
 
 
 def _venta(texto: str, plan: Plan, memoria: Memoria):
@@ -534,6 +687,22 @@ def _venta(texto: str, plan: Plan, memoria: Memoria):
                 f"Son {numero} letras: {_n(saldo)} / {numero} = "
                 f"{_n(memoria.valor_letra_cobrar)} cada una."
             )
+    elif porcentaje and _reparto_credito_contado(plano):
+        # "60% crédito y 40% al contado": una parte a caja y otra a clientes.
+        al_credito, al_contado = _reparto_credito_contado(plano)
+        caja, clientes = plan("caja"), plan("clientes")
+        if caja is None or clientes is None:
+            return None, "faltan las cuentas de caja o clientes"
+        contado = _r(total * al_contado / Decimal("100"))
+        credito = _r(total - contado)
+        lineas_debe = [LineaPropuesta(caja, debe=contado),
+                       LineaPropuesta(clientes, debe=credito)]
+        memoria.saldo_clientes += credito
+        explicacion.append(
+            f"Al contado el {_n_pct(al_contado)}%: {_n(total)} x {_n_pct(al_contado)}% = "
+            f"{_n(contado)}, entra a {caja.nombre}. Al crédito el {_n_pct(al_credito)}%: "
+            f"{_n(credito)}, queda por cobrar en {clientes.nombre}."
+        )
     else:
         destino, forma = ("caja", "al contado") if (
             "efectivo" in plano or "contado" in plano
@@ -756,11 +925,22 @@ CONSTRUCTORES = {
 }
 
 
+def _fecha_del_cierre(texto: str, ultima: date) -> date:
+    """El inventario final sin fecha va al cierre: fin de mes si lo dice así."""
+    plano = _plano(texto)
+    if any(frase in plano for frase in ("cierre del mes", "fin de mes", "final del mes",
+                                        "cierre de mes")):
+        siguiente = date(ultima.year + (ultima.month == 12), ultima.month % 12 + 1, 1)
+        return date.fromordinal(siguiente.toordinal() - 1)
+    return ultima
+
+
 def leer(texto: str, caso: CasoDominio, crear_cuentas: bool = True) -> Lectura:
     """Convierte el enunciado en asientos propuestos."""
     lectura = Lectura()
     plan = Plan(caso, crear=crear_cuentas)
     memoria = Memoria()
+    ultima_fecha: Optional[date] = None
 
     for numero, bloque in enumerate(_partir(texto), start=1):
         tipo = _clasificar(bloque)
@@ -778,6 +958,9 @@ def leer(texto: str, caso: CasoDominio, crear_cuentas: bool = True) -> Lectura:
                 "así que no te lo propongo."
             )
             continue
+        if asiento.fecha is None and tipo == "costo_ventas" and ultima_fecha:
+            asiento.fecha = _fecha_del_cierre(bloque, ultima_fecha)
+        ultima_fecha = asiento.fecha or ultima_fecha
         lectura.asientos.append(asiento)
 
     # Solo las cuentas que de verdad usó algún asiento propuesto.
@@ -943,6 +1126,9 @@ def datos_del_caso(texto: str) -> dict:
         comun = max({f.year for f in fechas}, key=lambda a: sum(1 for f in fechas if f.year == a))
         delmes = [f for f in fechas if f.year == comun]
         inicio, fin = min(delmes), max(delmes)
+        # "Al cierre del mes" fecha el costo de ventas el último día del mes.
+        if _es_inventario_final(_plano(texto)):
+            fin = max(fin, _fecha_del_cierre(texto, fin))
     else:
         inicio = fin = None
     return {
@@ -978,6 +1164,13 @@ def resolver(texto: str, caso: Optional[CasoDominio]) -> str:
                 f"No tenías ningún caso abierto, así que preparé uno nuevo: "
                 f"**{datos['nombre']}**, con su plan de cuentas. Lo creo al registrar."
             )
+        elif not EMPRESA.search(texto):
+            encabezado.append(
+                f"Este enunciado crea una empresa nueva, y tu caso abierto es "
+                f"**{caso.empresa.nombre or caso.nombre}**, que ya tiene asientos. Para "
+                f"no mezclar dos contabilidades, al registrar creo un caso aparte "
+                f"(**{datos['nombre']}**) y lo dejo abierto."
+            )
         else:
             encabezado.append(
                 f"Este enunciado es de **{datos['nombre']}**, y tu caso abierto es "
@@ -1002,6 +1195,14 @@ def _sin_forma_societaria(nombre: str) -> str:
     return " ".join(plano.split())
 
 
+def crea_una_empresa(texto: str) -> bool:
+    """¿El enunciado empieza por la constitución de una empresa?"""
+    bloques = _partir(texto)
+    return bool(bloques) and _clasificar(bloques[0]) == "apertura" and any(
+        frase in _plano(bloques[0]) for frase in CONSTITUCION
+    )
+
+
 def nombra_otra_empresa(texto: str, caso: Optional[CasoDominio]) -> bool:
     """¿El enunciado es de una empresa distinta a la del caso abierto?
 
@@ -1012,6 +1213,10 @@ def nombra_otra_empresa(texto: str, caso: Optional[CasoDominio]) -> bool:
         return True
     hallada = EMPRESA.search(texto)
     if not hallada:
+        # "Se crea una empresa con...": sin nombre, pero es otra empresa que
+        # recién nace. Solo el caso que todavía no tiene asientos puede serlo.
+        if crea_una_empresa(texto) and caso.asientos:
+            return True
         return False  # sin nombre, se asume que sigue el mismo caso
     delenunciado = _sin_forma_societaria(hallada.group(1))
     if not delenunciado:

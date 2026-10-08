@@ -729,3 +729,91 @@ class GenerarUnCasoTest(TestCase):
         balance = construir_balance_comprobacion(Caso.objects.get().a_dominio())
         self.assertTrue(balance.cuadrado)
         self.assertEqual(balance.total_debe, generado.total_debe)
+
+
+class LaEmpresaQueSeCreaEnElEnunciadoTest(TestCase):
+    """El enunciado que dejaron "para los tres primeros grupos", tal cual."""
+
+    ENUNCIADO = (
+        "PARA LOS TRES PRIMEROS GRUPOS\n"
+        "10/10/2026 Se crea una empresa con 100,000 al contado y 100,000 en maquinas.\n"
+        "15/10/2026 Se compra 50,000 de mercaderia al credito de 15 dias.\n"
+        "20/10/2026 SE realiza una venta por 100,000 soles (60% credito y 40% al contado)\n"
+        "25/10/2026 Se pagan gastos operativos por 50,000 soles al contado.\n"
+        "En el inventario se observa un saldo final de 25,000 soles al cierre del mes."
+    )
+
+    def _montos(self, lectura):
+        return [
+            {l.cuenta.nombre: (l.debe, l.haber) for l in asiento.lineas}
+            for asiento in lectura.asientos
+        ]
+
+    def _comprobar(self, lectura):
+        self.assertEqual(lectura.problemas, [])
+        self.assertEqual(len(lectura.asientos), 5)
+        constitucion, compra, venta, gasto, costo = self._montos(lectura)
+        cero = Decimal("0.00")
+
+        self.assertEqual(constitucion["Caja"], (Decimal("100000"), cero))
+        self.assertEqual(constitucion["Maquinaria y Equipo"], (Decimal("100000"), cero))
+        self.assertEqual(constitucion["Capital"], (cero, Decimal("200000.00")))
+
+        self.assertEqual(compra["Mercaderías"], (Decimal("50000"), cero))
+        self.assertEqual(compra["Proveedores"], (cero, Decimal("50000.00")))
+
+        self.assertEqual(venta["Caja"], (Decimal("40000.00"), cero))
+        self.assertEqual(venta["Clientes"], (Decimal("60000.00"), cero))
+        self.assertEqual(venta["Ventas"], (cero, Decimal("100000")))
+
+        self.assertEqual(gasto["Gastos Operativos"], (Decimal("50000"), cero))
+        self.assertEqual(gasto["Caja"], (cero, Decimal("50000.00")))
+
+        self.assertEqual(costo["Costo de Ventas"], (Decimal("25000.00"), cero))
+        self.assertEqual(costo["Mercaderías"], (cero, Decimal("25000.00")))
+        self.assertEqual(lectura.asientos[4].fecha.isoformat(), "2026-10-31")
+
+    def test_resuelve_las_cinco_operaciones(self):
+        self._comprobar(enunciados.leer(self.ENUNCIADO, enunciados.CASO_VACIO))
+
+    def test_pegado_en_una_sola_linea_tambien(self):
+        """Desde el celular el texto llega a veces con las líneas juntas."""
+        texto = " ".join(self.ENUNCIADO.splitlines())
+        self._comprobar(enunciados.leer(texto, enunciados.CASO_VACIO))
+
+    def test_con_otro_caso_abierto_lo_registra_aparte(self):
+        from ..datos.casos_demo import LOS_ANDES
+        from ..models import Caso
+
+        andes = crear_caso_demo(LOS_ANDES)
+        antes = andes.asientos.count()
+        self.client.post(reverse("caso_abrir", args=[andes.pk]))
+        datos = self.client.post(
+            reverse("asistente_registrar"),
+            data=json.dumps({"texto": self.ENUNCIADO}),
+            content_type="application/json",
+        ).json()
+
+        self.assertEqual(datos["guardados"], 5)
+        self.assertEqual(datos["errores"], [])
+        self.assertEqual(andes.asientos.count(), antes)  # Los Andes, intacto
+        nuevo = Caso.objects.exclude(pk=andes.pk).get()
+        self.assertEqual(nuevo.periodo_fin.isoformat(), "2026-10-31")
+        balance = construir_balance_comprobacion(nuevo.a_dominio())
+        self.assertTrue(balance.cuadrado)
+        self.assertEqual(balance.total_debe, Decimal("425000.00"))
+
+    def test_el_aviso_dice_que_es_una_empresa_nueva(self):
+        from ..datos.casos_demo import LOS_ANDES
+        from ..servicios import asistente
+
+        andes = crear_caso_demo(LOS_ANDES)
+        respuesta = asistente.responder(self.ENUNCIADO, andes.a_dominio())
+        self.assertIn("crea una empresa nueva", respuesta)
+        self.assertNotIn("no la reconocí", respuesta)
+
+    def test_con_n_antes_del_importe_no_lo_pierde(self):
+        """La "n" de "con 100,000" no es un "N.º" de letra."""
+        self.assertEqual(enunciados._importes("con 100,000 al contado"), [Decimal("100000")])
+        self.assertEqual(enunciados._importes("letras N.º 101 y 102 por S/ 5,000"),
+                         [Decimal("5000")])
